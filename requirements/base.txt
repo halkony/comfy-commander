@@ -6,3 +6,5 @@
 #
 attrs==25.4.0
     # via -r requirements/base.in
+pillow==11.3.0
+    # via -r requirements/base.in

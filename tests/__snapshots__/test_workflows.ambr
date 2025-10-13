@@ -1,7 +1,193 @@
 # serializer version: 1
-# name: TestWorkflows.test_workflow_node_editable_by_id
-  Workflow(data={'6': {'inputs': {'text': 'cute anime girl with massive fluffy fennec ears and a big fluffy tail blonde messy long hair blue eyes wearing a maid outfit with a long black gold leaf pattern dress and a white apron mouth open placing a fancy black forest cake with candles on top of a dinner table of an old dark Victorian mansion lit by candlelight with a bright window to the foggy forest and very expensive stuff everywhere there are paintings on the walls', 'clip': ['40', 1]}, 'class_type': 'CLIPTextEncode', '_meta': {'title': 'CLIP Text Encode (Positive Prompt)'}}, '8': {'inputs': {'samples': ['31', 0], 'vae': ['39', 0]}, 'class_type': 'VAEDecode', '_meta': {'title': 'VAE Decode'}}, '9': {'inputs': {'filename_prefix': 'ComfyUI', 'images': ['8', 0]}, 'class_type': 'SaveImage', '_meta': {'title': 'Save Image'}}, '27': {'inputs': {'width': 1024, 'height': 1024, 'batch_size': 1}, 'class_type': 'EmptySD3LatentImage', '_meta': {'title': 'EmptySD3LatentImage'}}, '30': {'inputs': {'ckpt_name': 'flux_project0_v40ArtRealismFP8.safetensors'}, 'class_type': 'CheckpointLoaderSimple', '_meta': {'title': 'Load Checkpoint'}}, '31': {'inputs': {'seed': 1234567890, 'steps': 8, 'cfg': 1, 'sampler_name': 'euler', 'scheduler': 'simple', 'denoise': 1, 'model': ['40', 0], 'positive': ['35', 0], 'negative': ['33', 0], 'latent_image': ['27', 0]}, 'class_type': 'KSampler', '_meta': {'title': 'KSampler'}}, '33': {'inputs': {'text': '', 'clip': ['40', 1]}, 'class_type': 'CLIPTextEncode', '_meta': {'title': 'CLIP Text Encode (Negative Prompt)'}}, '35': {'inputs': {'guidance': 3.5, 'conditioning': ['6', 0]}, 'class_type': 'FluxGuidance', '_meta': {'title': 'FluxGuidance'}}, '38': {'inputs': {'clip_name1': 't5xxl_fp8_e4m3fn_scaled.safetensors', 'clip_name2': 'clip_l.safetensors', 'type': 'flux', 'device': 'default'}, 'class_type': 'DualCLIPLoader', '_meta': {'title': 'DualCLIPLoader'}}, '39': {'inputs': {'vae_name': 'ae.safetensors'}, 'class_type': 'VAELoader', '_meta': {'title': 'Load VAE'}}, '40': {'inputs': {'lora_name': 'Hyper-FLUX.1-dev-8steps-lora.safetensors', 'strength_model': 0.1, 'strength_clip': 1, 'model': ['30', 0], 'clip': ['38', 0]}, 'class_type': 'LoraLoader', '_meta': {'title': 'Load LoRA'}}}, nodes={'6': Node(id='6', data={'inputs': {'text': 'cute anime girl with massive fluffy fennec ears and a big fluffy tail blonde messy long hair blue eyes wearing a maid outfit with a long black gold leaf pattern dress and a white apron mouth open placing a fancy black forest cake with candles on top of a dinner table of an old dark Victorian mansion lit by candlelight with a bright window to the foggy forest and very expensive stuff everywhere there are paintings on the walls', 'clip': ['40', 1]}, 'class_type': 'CLIPTextEncode', '_meta': {'title': 'CLIP Text Encode (Positive Prompt)'}}, inputs={'text': 'cute anime girl with massive fluffy fennec ears and a big fluffy tail blonde messy long hair blue eyes wearing a maid outfit with a long black gold leaf pattern dress and a white apron mouth open placing a fancy black forest cake with candles on top of a dinner table of an old dark Victorian mansion lit by candlelight with a bright window to the foggy forest and very expensive stuff everywhere there are paintings on the walls', 'clip': ['40', 1]}, class_type='CLIPTextEncode', meta={'title': 'CLIP Text Encode (Positive Prompt)'}), '8': Node(id='8', data={'inputs': {'samples': ['31', 0], 'vae': ['39', 0]}, 'class_type': 'VAEDecode', '_meta': {'title': 'VAE Decode'}}, inputs={'samples': ['31', 0], 'vae': ['39', 0]}, class_type='VAEDecode', meta={'title': 'VAE Decode'}), '9': Node(id='9', data={'inputs': {'filename_prefix': 'ComfyUI', 'images': ['8', 0]}, 'class_type': 'SaveImage', '_meta': {'title': 'Save Image'}}, inputs={'filename_prefix': 'ComfyUI', 'images': ['8', 0]}, class_type='SaveImage', meta={'title': 'Save Image'}), '27': Node(id='27', data={'inputs': {'width': 1024, 'height': 1024, 'batch_size': 1}, 'class_type': 'EmptySD3LatentImage', '_meta': {'title': 'EmptySD3LatentImage'}}, inputs={'width': 1024, 'height': 1024, 'batch_size': 1}, class_type='EmptySD3LatentImage', meta={'title': 'EmptySD3LatentImage'}), '30': Node(id='30', data={'inputs': {'ckpt_name': 'flux_project0_v40ArtRealismFP8.safetensors'}, 'class_type': 'CheckpointLoaderSimple', '_meta': {'title': 'Load Checkpoint'}}, inputs={'ckpt_name': 'flux_project0_v40ArtRealismFP8.safetensors'}, class_type='CheckpointLoaderSimple', meta={'title': 'Load Checkpoint'}), '31': Node(id='31', data={'inputs': {'seed': 1234567890, 'steps': 8, 'cfg': 1, 'sampler_name': 'euler', 'scheduler': 'simple', 'denoise': 1, 'model': ['40', 0], 'positive': ['35', 0], 'negative': ['33', 0], 'latent_image': ['27', 0]}, 'class_type': 'KSampler', '_meta': {'title': 'KSampler'}}, inputs={'seed': 1234567890, 'steps': 8, 'cfg': 1, 'sampler_name': 'euler', 'scheduler': 'simple', 'denoise': 1, 'model': ['40', 0], 'positive': ['35', 0], 'negative': ['33', 0], 'latent_image': ['27', 0]}, class_type='KSampler', meta={'title': 'KSampler'}), '33': Node(id='33', data={'inputs': {'text': '', 'clip': ['40', 1]}, 'class_type': 'CLIPTextEncode', '_meta': {'title': 'CLIP Text Encode (Negative Prompt)'}}, inputs={'text': '', 'clip': ['40', 1]}, class_type='CLIPTextEncode', meta={'title': 'CLIP Text Encode (Negative Prompt)'}), '35': Node(id='35', data={'inputs': {'guidance': 3.5, 'conditioning': ['6', 0]}, 'class_type': 'FluxGuidance', '_meta': {'title': 'FluxGuidance'}}, inputs={'guidance': 3.5, 'conditioning': ['6', 0]}, class_type='FluxGuidance', meta={'title': 'FluxGuidance'}), '38': Node(id='38', data={'inputs': {'clip_name1': 't5xxl_fp8_e4m3fn_scaled.safetensors', 'clip_name2': 'clip_l.safetensors', 'type': 'flux', 'device': 'default'}, 'class_type': 'DualCLIPLoader', '_meta': {'title': 'DualCLIPLoader'}}, inputs={'clip_name1': 't5xxl_fp8_e4m3fn_scaled.safetensors', 'clip_name2': 'clip_l.safetensors', 'type': 'flux', 'device': 'default'}, class_type='DualCLIPLoader', meta={'title': 'DualCLIPLoader'}), '39': Node(id='39', data={'inputs': {'vae_name': 'ae.safetensors'}, 'class_type': 'VAELoader', '_meta': {'title': 'Load VAE'}}, inputs={'vae_name': 'ae.safetensors'}, class_type='VAELoader', meta={'title': 'Load VAE'}), '40': Node(id='40', data={'inputs': {'lora_name': 'Hyper-FLUX.1-dev-8steps-lora.safetensors', 'strength_model': 0.1, 'strength_clip': 1, 'model': ['30', 0], 'clip': ['38', 0]}, 'class_type': 'LoraLoader', '_meta': {'title': 'Load LoRA'}}, inputs={'lora_name': 'Hyper-FLUX.1-dev-8steps-lora.safetensors', 'strength_model': 0.1, 'strength_clip': 1, 'model': ['30', 0], 'clip': ['38', 0]}, class_type='LoraLoader', meta={'title': 'Load LoRA'})})
+# name: TestWorkflows.test_can_load_workflow_from_example_image
+  dict({
+    '31': dict({
+      '_meta': dict({
+        'title': 'KSampler',
+      }),
+      'class_type': 'KSampler',
+      'inputs': dict({
+        'cfg': 1,
+        'denoise': 1,
+        'latent_image': list([
+          '27',
+          0,
+        ]),
+        'model': list([
+          '40',
+          0,
+        ]),
+        'negative': list([
+          '33',
+          0,
+        ]),
+        'positive': list([
+          '35',
+          0,
+        ]),
+        'sampler_name': 'euler',
+        'scheduler': 'simple',
+        'seed': 168903481166017,
+        'steps': 8,
+      }),
+    }),
+    '6': dict({
+      '_meta': dict({
+        'title': 'CLIP Text Encode (Positive Prompt)',
+      }),
+      'class_type': 'CLIPTextEncode',
+      'inputs': dict({
+        'clip': list([
+          '40',
+          1,
+        ]),
+        'text': 'cute anime girl with massive fluffy fennec ears and a big fluffy tail blonde messy long hair blue eyes wearing a maid outfit with a long black gold leaf pattern dress and a white apron mouth open placing a fancy black forest cake with candles on top of a dinner table of an old dark Victorian mansion lit by candlelight with a bright window to the foggy forest and very expensive stuff everywhere there are paintings on the walls',
+      }),
+    }),
+  })
 # ---
-# name: TestWorkflows.test_workflow_node_editable_by_name
-  Workflow(data={'6': {'inputs': {'text': 'cute anime girl with massive fluffy fennec ears and a big fluffy tail blonde messy long hair blue eyes wearing a maid outfit with a long black gold leaf pattern dress and a white apron mouth open placing a fancy black forest cake with candles on top of a dinner table of an old dark Victorian mansion lit by candlelight with a bright window to the foggy forest and very expensive stuff everywhere there are paintings on the walls', 'clip': ['40', 1]}, 'class_type': 'CLIPTextEncode', '_meta': {'title': 'CLIP Text Encode (Positive Prompt)'}}, '8': {'inputs': {'samples': ['31', 0], 'vae': ['39', 0]}, 'class_type': 'VAEDecode', '_meta': {'title': 'VAE Decode'}}, '9': {'inputs': {'filename_prefix': 'ComfyUI', 'images': ['8', 0]}, 'class_type': 'SaveImage', '_meta': {'title': 'Save Image'}}, '27': {'inputs': {'width': 1024, 'height': 1024, 'batch_size': 1}, 'class_type': 'EmptySD3LatentImage', '_meta': {'title': 'EmptySD3LatentImage'}}, '30': {'inputs': {'ckpt_name': 'flux_project0_v40ArtRealismFP8.safetensors'}, 'class_type': 'CheckpointLoaderSimple', '_meta': {'title': 'Load Checkpoint'}}, '31': {'inputs': {'seed': 1234567890, 'steps': 8, 'cfg': 1, 'sampler_name': 'euler', 'scheduler': 'simple', 'denoise': 1, 'model': ['40', 0], 'positive': ['35', 0], 'negative': ['33', 0], 'latent_image': ['27', 0]}, 'class_type': 'KSampler', '_meta': {'title': 'KSampler'}}, '33': {'inputs': {'text': '', 'clip': ['40', 1]}, 'class_type': 'CLIPTextEncode', '_meta': {'title': 'CLIP Text Encode (Negative Prompt)'}}, '35': {'inputs': {'guidance': 3.5, 'conditioning': ['6', 0]}, 'class_type': 'FluxGuidance', '_meta': {'title': 'FluxGuidance'}}, '38': {'inputs': {'clip_name1': 't5xxl_fp8_e4m3fn_scaled.safetensors', 'clip_name2': 'clip_l.safetensors', 'type': 'flux', 'device': 'default'}, 'class_type': 'DualCLIPLoader', '_meta': {'title': 'DualCLIPLoader'}}, '39': {'inputs': {'vae_name': 'ae.safetensors'}, 'class_type': 'VAELoader', '_meta': {'title': 'Load VAE'}}, '40': {'inputs': {'lora_name': 'Hyper-FLUX.1-dev-8steps-lora.safetensors', 'strength_model': 0.1, 'strength_clip': 1, 'model': ['30', 0], 'clip': ['38', 0]}, 'class_type': 'LoraLoader', '_meta': {'title': 'Load LoRA'}}}, nodes={'6': Node(id='6', data={'inputs': {'text': 'cute anime girl with massive fluffy fennec ears and a big fluffy tail blonde messy long hair blue eyes wearing a maid outfit with a long black gold leaf pattern dress and a white apron mouth open placing a fancy black forest cake with candles on top of a dinner table of an old dark Victorian mansion lit by candlelight with a bright window to the foggy forest and very expensive stuff everywhere there are paintings on the walls', 'clip': ['40', 1]}, 'class_type': 'CLIPTextEncode', '_meta': {'title': 'CLIP Text Encode (Positive Prompt)'}}, inputs={'text': 'cute anime girl with massive fluffy fennec ears and a big fluffy tail blonde messy long hair blue eyes wearing a maid outfit with a long black gold leaf pattern dress and a white apron mouth open placing a fancy black forest cake with candles on top of a dinner table of an old dark Victorian mansion lit by candlelight with a bright window to the foggy forest and very expensive stuff everywhere there are paintings on the walls', 'clip': ['40', 1]}, class_type='CLIPTextEncode', meta={'title': 'CLIP Text Encode (Positive Prompt)'}), '8': Node(id='8', data={'inputs': {'samples': ['31', 0], 'vae': ['39', 0]}, 'class_type': 'VAEDecode', '_meta': {'title': 'VAE Decode'}}, inputs={'samples': ['31', 0], 'vae': ['39', 0]}, class_type='VAEDecode', meta={'title': 'VAE Decode'}), '9': Node(id='9', data={'inputs': {'filename_prefix': 'ComfyUI', 'images': ['8', 0]}, 'class_type': 'SaveImage', '_meta': {'title': 'Save Image'}}, inputs={'filename_prefix': 'ComfyUI', 'images': ['8', 0]}, class_type='SaveImage', meta={'title': 'Save Image'}), '27': Node(id='27', data={'inputs': {'width': 1024, 'height': 1024, 'batch_size': 1}, 'class_type': 'EmptySD3LatentImage', '_meta': {'title': 'EmptySD3LatentImage'}}, inputs={'width': 1024, 'height': 1024, 'batch_size': 1}, class_type='EmptySD3LatentImage', meta={'title': 'EmptySD3LatentImage'}), '30': Node(id='30', data={'inputs': {'ckpt_name': 'flux_project0_v40ArtRealismFP8.safetensors'}, 'class_type': 'CheckpointLoaderSimple', '_meta': {'title': 'Load Checkpoint'}}, inputs={'ckpt_name': 'flux_project0_v40ArtRealismFP8.safetensors'}, class_type='CheckpointLoaderSimple', meta={'title': 'Load Checkpoint'}), '31': Node(id='31', data={'inputs': {'seed': 1234567890, 'steps': 8, 'cfg': 1, 'sampler_name': 'euler', 'scheduler': 'simple', 'denoise': 1, 'model': ['40', 0], 'positive': ['35', 0], 'negative': ['33', 0], 'latent_image': ['27', 0]}, 'class_type': 'KSampler', '_meta': {'title': 'KSampler'}}, inputs={'seed': 1234567890, 'steps': 8, 'cfg': 1, 'sampler_name': 'euler', 'scheduler': 'simple', 'denoise': 1, 'model': ['40', 0], 'positive': ['35', 0], 'negative': ['33', 0], 'latent_image': ['27', 0]}, class_type='KSampler', meta={'title': 'KSampler'}), '33': Node(id='33', data={'inputs': {'text': '', 'clip': ['40', 1]}, 'class_type': 'CLIPTextEncode', '_meta': {'title': 'CLIP Text Encode (Negative Prompt)'}}, inputs={'text': '', 'clip': ['40', 1]}, class_type='CLIPTextEncode', meta={'title': 'CLIP Text Encode (Negative Prompt)'}), '35': Node(id='35', data={'inputs': {'guidance': 3.5, 'conditioning': ['6', 0]}, 'class_type': 'FluxGuidance', '_meta': {'title': 'FluxGuidance'}}, inputs={'guidance': 3.5, 'conditioning': ['6', 0]}, class_type='FluxGuidance', meta={'title': 'FluxGuidance'}), '38': Node(id='38', data={'inputs': {'clip_name1': 't5xxl_fp8_e4m3fn_scaled.safetensors', 'clip_name2': 'clip_l.safetensors', 'type': 'flux', 'device': 'default'}, 'class_type': 'DualCLIPLoader', '_meta': {'title': 'DualCLIPLoader'}}, inputs={'clip_name1': 't5xxl_fp8_e4m3fn_scaled.safetensors', 'clip_name2': 'clip_l.safetensors', 'type': 'flux', 'device': 'default'}, class_type='DualCLIPLoader', meta={'title': 'DualCLIPLoader'}), '39': Node(id='39', data={'inputs': {'vae_name': 'ae.safetensors'}, 'class_type': 'VAELoader', '_meta': {'title': 'Load VAE'}}, inputs={'vae_name': 'ae.safetensors'}, class_type='VAELoader', meta={'title': 'Load VAE'}), '40': Node(id='40', data={'inputs': {'lora_name': 'Hyper-FLUX.1-dev-8steps-lora.safetensors', 'strength_model': 0.1, 'strength_clip': 1, 'model': ['30', 0], 'clip': ['38', 0]}, 'class_type': 'LoraLoader', '_meta': {'title': 'Load LoRA'}}, inputs={'lora_name': 'Hyper-FLUX.1-dev-8steps-lora.safetensors', 'strength_model': 0.1, 'strength_clip': 1, 'model': ['30', 0], 'clip': ['38', 0]}, class_type='LoraLoader', meta={'title': 'Load LoRA'})})
+# name: TestWorkflows.test_can_load_workflow_from_example_image.1
+  dict({
+    'config': dict({
+    }),
+    'extra': dict({
+      'VHS_KeepIntermediate': True,
+      'VHS_MetadataImage': True,
+      'VHS_latentpreview': True,
+      'VHS_latentpreviewrate': 0,
+      'ds': dict({
+        'offset': list([
+          560.9919785809209,
+          195.68797129473234,
+        ]),
+        'scale': 0.661157024793391,
+      }),
+      'frontendVersion': '1.27.10',
+      'links_added_by_ue': list([
+      ]),
+      'ue_links': list([
+      ]),
+    }),
+    'groups': list([
+    ]),
+    'id': '47c4dc0e-92f7-4ec2-ad49-32b50601a69f',
+    'last_link_id': 65,
+    'last_node_id': 40,
+    'links': list([
+    ]),
+    'nodes': list([
+      dict({
+        'bgcolor': '#353',
+        'color': '#232',
+        'flags': dict({
+        }),
+        'id': 6,
+        'inputs': list([
+          dict({
+            'link': 64,
+            'name': 'clip',
+            'type': 'CLIP',
+          }),
+        ]),
+        'mode': 0,
+        'order': 6,
+        'outputs': list([
+          dict({
+            'links': list([
+              56,
+            ]),
+            'name': 'CONDITIONING',
+            'slot_index': 0,
+            'type': 'CONDITIONING',
+          }),
+        ]),
+        'pos': list([
+          384,
+          192,
+        ]),
+        'properties': dict({
+          'Node name for S&R': 'CLIPTextEncode',
+          'cnr_id': 'comfy-core',
+          'ver': '0.3.64',
+          'widget_ue_connectable': dict({
+          }),
+        }),
+        'size': list([
+          422.8500061035156,
+          164.30999755859375,
+        ]),
+        'title': 'CLIP Text Encode (Positive Prompt)',
+        'type': 'CLIPTextEncode',
+        'widgets_values': list([
+          'cute anime girl with massive fluffy fennec ears and a big fluffy tail blonde messy long hair blue eyes wearing a maid outfit with a long black gold leaf pattern dress and a white apron mouth open placing a fancy black forest cake with candles on top of a dinner table of an old dark Victorian mansion lit by candlelight with a bright window to the foggy forest and very expensive stuff everywhere there are paintings on the walls',
+        ]),
+      }),
+      dict({
+        'flags': dict({
+        }),
+        'id': 31,
+        'inputs': list([
+          dict({
+            'link': 62,
+            'name': 'model',
+            'type': 'MODEL',
+          }),
+          dict({
+            'link': 57,
+            'name': 'positive',
+            'type': 'CONDITIONING',
+          }),
+          dict({
+            'link': 55,
+            'name': 'negative',
+            'type': 'CONDITIONING',
+          }),
+          dict({
+            'link': 51,
+            'name': 'latent_image',
+            'type': 'LATENT',
+          }),
+        ]),
+        'mode': 0,
+        'order': 9,
+        'outputs': list([
+          dict({
+            'links': list([
+              52,
+            ]),
+            'name': 'LATENT',
+            'slot_index': 0,
+            'type': 'LATENT',
+          }),
+        ]),
+        'pos': list([
+          816,
+          192,
+        ]),
+        'properties': dict({
+          'Node name for S&R': 'KSampler',
+          'cnr_id': 'comfy-core',
+          'ver': '0.3.64',
+          'widget_ue_connectable': dict({
+          }),
+        }),
+        'size': list([
+          315,
+          571,
+        ]),
+        'type': 'KSampler',
+        'widgets_values': list([
+          168903481166017,
+          'randomize',
+          8,
+          1,
+          'euler',
+          'simple',
+          1,
+        ]),
+      }),
+    ]),
+    'revision': 0,
+    'version': 0.4,
+  })
 # ---

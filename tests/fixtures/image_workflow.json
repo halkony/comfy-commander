@@ -1,0 +1,147 @@
+{
+  "workflow": {
+    "id": "47c4dc0e-92f7-4ec2-ad49-32b50601a69f",
+    "revision": 0,
+    "last_node_id": 40,
+    "last_link_id": 65,
+    "nodes": [
+      {
+        "id": 6,
+        "type": "CLIPTextEncode",
+        "pos": [384, 192],
+        "size": [422.8500061035156, 164.30999755859375],
+        "flags": {},
+        "order": 6,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "clip",
+            "type": "CLIP",
+            "link": 64
+          }
+        ],
+        "outputs": [
+          {
+            "name": "CONDITIONING",
+            "type": "CONDITIONING",
+            "slot_index": 0,
+            "links": [56]
+          }
+        ],
+        "title": "CLIP Text Encode (Positive Prompt)",
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.64",
+          "Node name for S&R": "CLIPTextEncode",
+          "widget_ue_connectable": {}
+        },
+        "widgets_values": [
+          "cute anime girl with massive fluffy fennec ears and a big fluffy tail blonde messy long hair blue eyes wearing a maid outfit with a long black gold leaf pattern dress and a white apron mouth open placing a fancy black forest cake with candles on top of a dinner table of an old dark Victorian mansion lit by candlelight with a bright window to the foggy forest and very expensive stuff everywhere there are paintings on the walls"
+        ],
+        "color": "#232",
+        "bgcolor": "#353"
+      },
+      {
+        "id": 31,
+        "type": "KSampler",
+        "pos": [816, 192],
+        "size": [315, 571],
+        "flags": {},
+        "order": 9,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "model",
+            "type": "MODEL",
+            "link": 62
+          },
+          {
+            "name": "positive",
+            "type": "CONDITIONING",
+            "link": 57
+          },
+          {
+            "name": "negative",
+            "type": "CONDITIONING",
+            "link": 55
+          },
+          {
+            "name": "latent_image",
+            "type": "LATENT",
+            "link": 51
+          }
+        ],
+        "outputs": [
+          {
+            "name": "LATENT",
+            "type": "LATENT",
+            "slot_index": 0,
+            "links": [52]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.64",
+          "Node name for S&R": "KSampler",
+          "widget_ue_connectable": {}
+        },
+        "widgets_values": [
+          168903481166017,
+          "randomize",
+          8,
+          1,
+          "euler",
+          "simple",
+          1
+        ]
+      }
+    ],
+    "links": [],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "ds": {
+        "scale": 0.661157024793391,
+        "offset": [560.9919785809209, 195.68797129473234]
+      },
+      "ue_links": [],
+      "links_added_by_ue": [],
+      "frontendVersion": "1.27.10",
+      "VHS_latentpreview": true,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "prompt": {
+    "6": {
+      "inputs": {
+        "text": "cute anime girl with massive fluffy fennec ears and a big fluffy tail blonde messy long hair blue eyes wearing a maid outfit with a long black gold leaf pattern dress and a white apron mouth open placing a fancy black forest cake with candles on top of a dinner table of an old dark Victorian mansion lit by candlelight with a bright window to the foggy forest and very expensive stuff everywhere there are paintings on the walls",
+        "clip": ["40", 1]
+      },
+      "class_type": "CLIPTextEncode",
+      "_meta": {
+        "title": "CLIP Text Encode (Positive Prompt)"
+      }
+    },
+    "31": {
+      "inputs": {
+        "seed": 168903481166017,
+        "steps": 8,
+        "cfg": 1,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1,
+        "model": ["40", 0],
+        "positive": ["35", 0],
+        "negative": ["33", 0],
+        "latent_image": ["27", 0]
+      },
+      "class_type": "KSampler",
+      "_meta": {
+        "title": "KSampler"
+      }
+    }
+  }
+}
