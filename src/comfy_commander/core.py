@@ -454,7 +454,7 @@ class ComfyUIServer:
     """Handles communication with a local ComfyUI server."""
     
     base_url: str = attrs.field(default="http://localhost:8188")
-    timeout: int = attrs.field(default=30)
+    timeout: Optional[int] = attrs.field(default=None)
     
     def __attrs_post_init__(self):
         """Initialize after attrs initialization."""
@@ -619,13 +619,13 @@ class ComfyUIServer:
         
         return images
     
-    async def wait_for_completion(self, prompt_id: str, poll_interval: float = 1.0, timeout: float = 300.0) -> Dict[str, Any]:
+    async def wait_for_completion(self, prompt_id: str, poll_interval: float = 1.0, timeout: Optional[float] = None) -> Dict[str, Any]:
         """Wait for a workflow execution to complete.
         
         Args:
             prompt_id: The prompt ID to wait for
             poll_interval: How often to check for completion (seconds)
-            timeout: Maximum time to wait (seconds)
+            timeout: Maximum time to wait (seconds). If None, wait indefinitely.
             
         Returns:
             The execution result data
@@ -637,8 +637,8 @@ class ComfyUIServer:
         start_time = asyncio.get_event_loop().time()
         
         while True:
-            # Check if we've exceeded the timeout
-            if asyncio.get_event_loop().time() - start_time > timeout:
+            # Check if we've exceeded the timeout (only if timeout is specified)
+            if timeout is not None and asyncio.get_event_loop().time() - start_time > timeout:
                 raise asyncio.TimeoutError(f"Execution {prompt_id} did not complete within {timeout} seconds")
             
             # Check the history to see if execution is complete
@@ -681,7 +681,7 @@ class ComfyUIServer:
         return self._send_workflow_to_server(workflow.api_json, client_id)
     
     def execute(self, workflow: "Workflow", client_id: str = "comfy-commander", 
-                poll_interval: float = 1.0, timeout: float = 300.0) -> ExecutionResult:
+                poll_interval: float = 1.0, timeout: Optional[float] = None) -> ExecutionResult:
         """Execute a workflow on this server and wait for completion.
         
         This method always waits for the workflow to complete and returns an ExecutionResult
@@ -691,7 +691,7 @@ class ComfyUIServer:
             workflow: The workflow to execute
             client_id: Client identifier for the execution
             poll_interval: How often to check for completion (seconds)
-            timeout: Maximum time to wait for completion (seconds)
+            timeout: Maximum time to wait for completion (seconds). If None, wait indefinitely.
             
         Returns:
             ExecutionResult with images and execution status
