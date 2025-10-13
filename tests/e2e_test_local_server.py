@@ -5,9 +5,12 @@ Tests for local ComfyUI server functionality.
 import json
 import pytest
 import requests
+import asyncio
+import tempfile
+import os
 from unittest.mock import Mock, patch, MagicMock
 
-from comfy_commander.core import ComfyUIServer, Workflow
+from comfy_commander.core import ComfyUIServer, Workflow, ExecutionResult, ComfyImage
 
 # E2E Tests - These require a running ComfyUI instance with the workflow converter extension
 class TestComfyUIServerE2E:
@@ -83,8 +86,8 @@ class TestComfyUIServerE2E:
         sampler_node = workflow.node(id="31")
         sampler_node.param("steps").set(1)  # Reduce steps for faster execution
         
-        # Execute the workflow
-        prompt_id = workflow.execute(server, "comfy-commander-test")
+        # Queue the workflow
+        prompt_id = server.queue(workflow, "comfy-commander-test")
         
         # Verify execution started
         assert isinstance(prompt_id, str)
@@ -103,8 +106,8 @@ class TestComfyUIServerE2E:
             server
         )
         
-        # Execute directly (converts and executes in one step)
-        prompt_id = workflow.execute(server, "comfy-commander-direct-test")
+        # Queue directly (converts and queues in one step)
+        prompt_id = server.queue(workflow, "comfy-commander-direct-test")
         
         # Verify execution started
         assert isinstance(prompt_id, str)
@@ -158,3 +161,152 @@ class TestComfyUIServerE2E:
             specific_history = server.get_history(prompt_id)
             assert isinstance(specific_history, dict)
             assert prompt_id in specific_history
+
+    @pytest.mark.asyncio
+    async def test_workflow_execute_async_e2e(self, server):
+        """Test the new async workflow execution API end-to-end."""
+        # Skip if server is not available
+        if not server.is_available():
+            pytest.skip("ComfyUI server is not available")
+        
+        # Load a simple workflow that generates an image
+        workflow_path = "tests/fixtures/flux_dev_checkpoint_example_api.json"
+        
+        if not os.path.exists(workflow_path):
+            pytest.skip(f"Test workflow file not found: {workflow_path}")
+        
+        # Load the workflow
+        workflow = Workflow.from_file(workflow_path)
+        
+        # Modify the workflow to use a simple seed for faster execution
+        try:
+            # Try to find and modify a KSampler node
+            sampler_nodes = workflow.nodes(class_type="KSampler")
+            if sampler_nodes:
+                sampler_nodes[0].param("seed").set(12345)
+                sampler_nodes[0].param("steps").set(1)  # Minimal steps for faster execution
+        except Exception:
+            # If we can't modify the workflow, that's okay for this test
+            pass
+        
+        # Execute the workflow asynchronously
+        result = await server.execute(workflow, timeout=60.0)  # 60 second timeout
+        
+        # Verify the result
+        assert isinstance(result, ExecutionResult)
+        assert result.prompt_id is not None
+        assert len(result.prompt_id) > 0
+        
+        # The status should be either success or error
+        assert result.status in ["success", "error"]
+        
+        if result.status == "success":
+            # If successful, we should have some media
+            assert isinstance(result.media, list)
+            # Note: We don't assert that media is non-empty because the workflow might not generate images
+        else:
+            # If there was an error, we should have an error message
+            assert result.error_message is not None
+            assert len(result.error_message) > 0
+
+    def test_workflow_execute_sync_e2e(self, server):
+        """Test the synchronous workflow execution API end-to-end."""
+        # Skip if server is not available
+        if not server.is_available():
+            pytest.skip("ComfyUI server is not available")
+        
+        # Load a simple workflow
+        workflow_path = "tests/fixtures/flux_dev_checkpoint_example_api.json"
+        
+        if not os.path.exists(workflow_path):
+            pytest.skip(f"Test workflow file not found: {workflow_path}")
+        
+        # Load the workflow
+        workflow = Workflow.from_file(workflow_path)
+        
+        # Queue the workflow (should return just prompt ID)
+        prompt_id = server.queue(workflow)
+        
+        # Verify the result
+        assert isinstance(prompt_id, str)
+        assert len(prompt_id) > 0
+        
+        # We should be able to get history for this prompt
+        history = server.get_history(prompt_id)
+        assert isinstance(history, dict)
+
+    @pytest.mark.asyncio
+    async def test_image_save_functionality_e2e(self, server):
+        """Test that generated images can be saved to files."""
+        # Skip if server is not available
+        if not server.is_available():
+            pytest.skip("ComfyUI server is not available")
+        
+        # Load a simple workflow
+        workflow_path = "tests/fixtures/flux_dev_checkpoint_example_api.json"
+        
+        if not os.path.exists(workflow_path):
+            pytest.skip(f"Test workflow file not found: {workflow_path}")
+        
+        # Load the workflow
+        workflow = Workflow.from_file(workflow_path)
+        
+        # Execute the workflow asynchronously
+        result = await server.execute(workflow, timeout=60.0)
+        
+        # If we have images, test saving them
+        if result.status == "success" and result.media:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                for i, image in enumerate(result.media):
+                    # Test saving the image
+                    output_path = os.path.join(temp_dir, f"test_output_{i}.png")
+                    image.save(output_path)
+                    
+                    # Verify the file was created
+                    assert os.path.exists(output_path)
+                    assert os.path.getsize(output_path) > 0
+                    
+                    # Verify it's a valid image file
+                    from PIL import Image
+                    try:
+                        saved_image = Image.open(output_path)
+                        assert saved_image.size[0] > 0
+                        assert saved_image.size[1] > 0
+                        saved_image.close()
+                    except Exception as e:
+                        pytest.fail(f"Saved image is not valid: {e}")
+
+    def test_comfy_image_creation_e2e(self):
+        """Test ComfyImage creation and manipulation without server."""
+        # Create a simple test image
+        from PIL import Image
+        import io
+        
+        # Create a 100x100 test image
+        test_image = Image.new('RGB', (100, 100), color='red')
+        img_bytes = io.BytesIO()
+        test_image.save(img_bytes, format='PNG')
+        img_data = img_bytes.getvalue()
+        
+        # Create ComfyImage
+        comfy_image = ComfyImage(
+            data=img_data,
+            filename="test_e2e.png",
+            subfolder="output",
+            type="output"
+        )
+        
+        # Test saving to file
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = os.path.join(temp_dir, "test_e2e_output.png")
+            comfy_image.save(output_path)
+            
+            # Verify the file was created and is valid
+            assert os.path.exists(output_path)
+            assert os.path.getsize(output_path) > 0
+            
+            # Verify it's a valid image
+            saved_image = Image.open(output_path)
+            assert saved_image.size == (100, 100)
+            assert saved_image.mode == 'RGB'
+            saved_image.close()

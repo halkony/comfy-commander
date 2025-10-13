@@ -8,7 +8,7 @@ Comfy Commander is a package for programmatically running ComfyUI workloads eith
 
 ### Basic Workflow Usage
 ```python
-from comfy_commander.core import Workflow
+from comfy_commander import Workflow
 
 # Load an API format workflow
 workflow = Workflow.from_file("./image_workflow.json")
@@ -24,14 +24,35 @@ print(f"Current seed: {sampler_node.param('seed').value}")
 
 ### Direct Execution
 ```python
-from comfy_commander.core import ComfyUIServer, Workflow
+import asyncio
+from comfy_commander import ComfyUIServer, Workflow
 
 server = ComfyUIServer("http://localhost:8188")
-workflow = Workflow.from_file("./workflow.json", server)
+workflow = Workflow.from_file("./workflow.json")
 
-# Convert and execute in one step
-prompt_id = workflow.execute(server)
-print(f"Workflow executed with prompt ID: {prompt_id}")
+async def main():
+    # Execute and wait for completion (returns ExecutionResult with images)
+    result = await server.execute(workflow)
+    for i, image in enumerate(result.media):
+        image.save(f"./image_{i}.png")
+
+if __name__ == "__main__":
+    asyncio.run(main)
+```
+
+### Queue for Later Processing
+```python
+from comfy_commander import ComfyUIServer, Workflow
+
+server = ComfyUIServer("http://localhost:8188")
+workflow = Workflow.from_file("./workflow.json")
+
+# Queue workflow and get prompt ID immediately
+prompt_id = server.queue(workflow)
+print(f"Workflow queued with ID: {prompt_id}")
+
+# Later, check status or get results
+history = server.get_history(prompt_id)
 ```
 
 ## Requirements

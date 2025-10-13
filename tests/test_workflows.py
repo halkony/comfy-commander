@@ -1,5 +1,9 @@
 import pytest
-from comfy_commander import Workflow
+import asyncio
+import tempfile
+import os
+from unittest.mock import Mock, patch, MagicMock
+from comfy_commander import Workflow, ComfyUIServer, ComfyImage, ExecutionResult
 from helpers import (
     assert_api_param_updated,
     assert_gui_widget_updated,
@@ -260,3 +264,247 @@ class TestWorkflows:
         # Verify both JSON formats were updated
         assert_api_param_updated(workflow, "31", "seed", 777777777)
         assert_gui_widget_updated(workflow, 31, 0, 777777777)
+
+    def test_comfy_image_creation_and_save(self):
+        """Test ComfyImage creation and save functionality."""
+        # Create a simple test image
+        from PIL import Image
+        import io
+        
+        # Create a 100x100 red image
+        test_image = Image.new('RGB', (100, 100), color='red')
+        img_bytes = io.BytesIO()
+        test_image.save(img_bytes, format='PNG')
+        img_data = img_bytes.getvalue()
+        
+        # Create ComfyImage
+        comfy_image = ComfyImage(
+            data=img_data,
+            filename="test.png",
+            subfolder="output",
+            type="output"
+        )
+        
+        # Test saving to file
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+            tmp_path = tmp_file.name
+        
+        try:
+            comfy_image.save(tmp_path)
+            
+            # Verify the file was created and contains the image
+            assert os.path.exists(tmp_path)
+            saved_image = Image.open(tmp_path)
+            assert saved_image.size == (100, 100)
+            assert saved_image.mode == 'RGB'
+            saved_image.close()  # Close the image to release file handle
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except PermissionError:
+                    # On Windows, sometimes the file is still locked
+                    pass
+
+    def test_comfy_image_from_base64(self):
+        """Test ComfyImage creation from base64 data."""
+        import base64
+        
+        # Create test image data
+        from PIL import Image
+        import io
+        
+        test_image = Image.new('RGB', (50, 50), color='blue')
+        img_bytes = io.BytesIO()
+        test_image.save(img_bytes, format='PNG')
+        img_data = img_bytes.getvalue()
+        
+        # Encode to base64
+        base64_data = base64.b64encode(img_data).decode('utf-8')
+        
+        # Create ComfyImage from base64
+        comfy_image = ComfyImage.from_base64(
+            base64_data,
+            filename="base64_test.png",
+            subfolder="test",
+            type="input"
+        )
+        
+        # Verify properties
+        assert comfy_image.filename == "base64_test.png"
+        assert comfy_image.subfolder == "test"
+        assert comfy_image.type == "input"
+        assert len(comfy_image.data) > 0
+
+    def test_execution_result_creation(self):
+        """Test ExecutionResult creation and properties."""
+        # Create test images
+        image1 = ComfyImage(data=b"fake_image_data_1", filename="test1.png")
+        image2 = ComfyImage(data=b"fake_image_data_2", filename="test2.png")
+        
+        # Create ExecutionResult
+        result = ExecutionResult(
+            prompt_id="test_prompt_123",
+            media=[image1, image2],
+            status="success"
+        )
+        
+        # Verify properties
+        assert result.prompt_id == "test_prompt_123"
+        assert len(result.media) == 2
+        assert result.media[0].filename == "test1.png"
+        assert result.media[1].filename == "test2.png"
+        assert result.status == "success"
+        assert result.error_message is None
+
+    def test_execution_result_with_error(self):
+        """Test ExecutionResult with error status."""
+        result = ExecutionResult(
+            prompt_id="failed_prompt_456",
+            media=[],
+            status="error",
+            error_message="Test error message"
+        )
+        
+        assert result.prompt_id == "failed_prompt_456"
+        assert len(result.media) == 0
+        assert result.status == "error"
+        assert result.error_message == "Test error message"
+
+    def test_server_queue_method(self):
+        """Test server.queue(workflow) returns prompt ID immediately."""
+        from unittest.mock import patch
+        
+        # Create a real ComfyUIServer instance
+        server = ComfyUIServer("http://localhost:8188")
+        
+        # Mock the _send_workflow_to_server method at class level
+        with patch.object(ComfyUIServer, '_send_workflow_to_server', return_value="test_prompt_123"):
+            # Create workflow
+            api_json = {"1": {"class_type": "KSampler", "inputs": {"seed": 123}}}
+            gui_json = {"nodes": [], "links": []}
+            workflow = Workflow(api_json=api_json, gui_json=gui_json)
+            
+            # Queue the workflow
+            result = server.queue(workflow)
+            
+            # Should return just the prompt ID
+            assert result == "test_prompt_123"
+    
+    def test_server_execute_sync_mode(self):
+        """Test server.execute(workflow) in synchronous mode waits for completion."""
+        from unittest.mock import patch
+        import threading
+        
+        def run_in_thread():
+            # Create a real ComfyUIServer instance
+            server = ComfyUIServer("http://localhost:8188")
+            
+            # Mock the async methods
+            mock_execution_data = {
+                "status": {"status_str": "success"},
+                "outputs": {}
+            }
+            
+            # Create a coroutine for the async method
+            async def mock_wait_for_completion(*args, **kwargs):
+                return mock_execution_data
+            
+            # Mock the methods at class level
+            with patch.object(ComfyUIServer, '_send_workflow_to_server', return_value="test_prompt_123"), \
+                 patch.object(ComfyUIServer, 'wait_for_completion', side_effect=mock_wait_for_completion), \
+                 patch.object(ComfyUIServer, 'get_output_images', return_value=[ComfyImage(data=b"fake_image", filename="test_output.png")]):
+                
+                # Create workflow
+                api_json = {"1": {"class_type": "KSampler", "inputs": {"seed": 123}}}
+                gui_json = {"nodes": [], "links": []}
+                workflow = Workflow(api_json=api_json, gui_json=gui_json)
+                
+                # Execute in sync mode (should wait for completion)
+                result = server.execute(workflow)
+                
+                # Should return ExecutionResult
+                assert isinstance(result, ExecutionResult)
+                assert result.prompt_id == "test_prompt_123"
+                assert result.status == "success"
+                assert len(result.media) == 1
+        
+        # Run in a separate thread to avoid async context
+        thread = threading.Thread(target=run_in_thread)
+        thread.start()
+        thread.join()
+
+    @pytest.mark.asyncio
+    async def test_server_execute_async_mode(self):
+        """Test server.execute(workflow) in asynchronous mode."""
+        from unittest.mock import patch
+        
+        # Create a real ComfyUIServer instance
+        server = ComfyUIServer("http://localhost:8188")
+        
+        # Mock the async methods
+        mock_execution_data = {
+            "status": {"status_str": "success"},
+            "outputs": {
+                "31": {
+                    "images": [
+                        {
+                            "filename": "test_output.png",
+                            "subfolder": "output",
+                            "type": "output"
+                        }
+                    ]
+                }
+            }
+        }
+        
+        # Create a coroutine for the async method
+        async def mock_wait_for_completion(*args, **kwargs):
+            return mock_execution_data
+        
+        # Create workflow
+        api_json = {"1": {"class_type": "KSampler", "inputs": {"seed": 123}}}
+        gui_json = {"nodes": [], "links": []}
+        workflow = Workflow(api_json=api_json, gui_json=gui_json)
+        
+        # Mock the methods at class level
+        with patch.object(ComfyUIServer, '_send_workflow_to_server', return_value="test_prompt_123"), \
+             patch.object(ComfyUIServer, 'wait_for_completion', side_effect=mock_wait_for_completion), \
+             patch.object(ComfyUIServer, 'get_output_images', return_value=[ComfyImage(data=b"fake_image", filename="test_output.png")]):
+            
+            # Execute in async mode
+            result = await server.execute(workflow)
+            
+            # Should return ExecutionResult
+            assert isinstance(result, ExecutionResult)
+            assert result.prompt_id == "test_prompt_123"
+            assert result.status == "success"
+            assert len(result.media) == 1
+            assert result.media[0].filename == "test_output.png"
+
+    @pytest.mark.asyncio
+    async def test_server_execute_async_with_error(self):
+        """Test server.execute(workflow) in async mode with execution error."""
+        from unittest.mock import patch
+        
+        # Create a real ComfyUIServer instance
+        server = ComfyUIServer("http://localhost:8188")
+        
+        # Create workflow
+        api_json = {"1": {"class_type": "KSampler", "inputs": {"seed": 123}}}
+        gui_json = {"nodes": [], "links": []}
+        workflow = Workflow(api_json=api_json, gui_json=gui_json)
+        
+        # Mock the methods to simulate an error
+        with patch.object(ComfyUIServer, '_send_workflow_to_server', return_value="test_prompt_456"), \
+             patch.object(ComfyUIServer, 'wait_for_completion', side_effect=RuntimeError("Execution failed")):
+            
+            # Execute in async mode
+            result = await server.execute(workflow)
+            
+            # Should return ExecutionResult with error
+            assert isinstance(result, ExecutionResult)
+            assert result.prompt_id == "test_prompt_456"
+            assert result.status == "error"
+            assert "Execution failed" in result.error_message
+            assert len(result.media) == 0

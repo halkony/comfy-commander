@@ -94,7 +94,7 @@ class TestComfyUIServer:
             server.convert_workflow(workflow_data)
     
     @patch('requests.post')
-    def test_execute_workflow_success(self, mock_post):
+    def test_send_workflow_to_server_success(self, mock_post):
         """Test successful workflow execution."""
         mock_response = Mock()
         mock_response.status_code = 200
@@ -104,7 +104,7 @@ class TestComfyUIServer:
         server = ComfyUIServer()
         api_workflow = {"6": {"inputs": {"text": "test"}, "class_type": "CLIPTextEncode"}}
         
-        result = server.execute_workflow(api_workflow, "test-client")
+        result = server._send_workflow_to_server(api_workflow, "test-client")
         
         assert result == "test-prompt-123"
         mock_post.assert_called_once_with(
@@ -251,12 +251,12 @@ class TestWorkflow:
         
         with patch('comfy_commander.core.ComfyUIServer.is_available', return_value=True), \
              patch('comfy_commander.core.ComfyUIServer.convert_workflow') as mock_convert, \
-             patch('comfy_commander.core.ComfyUIServer.execute_workflow') as mock_execute:
+             patch('comfy_commander.core.ComfyUIServer._send_workflow_to_server') as mock_execute:
             mock_convert.return_value = {"6": {"inputs": {"text": "test"}, "class_type": "CLIPTextEncode"}}
             mock_execute.return_value = "test-prompt-123"
             
             server = ComfyUIServer()
-            result = workflow.execute(server)
+            result = server.queue(workflow)
             
             assert result == "test-prompt-123"
             mock_convert.assert_called_once_with(gui_data)
@@ -267,11 +267,11 @@ class TestWorkflow:
         api_data = {"6": {"inputs": {"text": "test"}, "class_type": "CLIPTextEncode"}}
         workflow = Workflow(api_json=api_data, gui_json={})
         
-        with patch('comfy_commander.core.ComfyUIServer.execute_workflow') as mock_execute:
+        with patch('comfy_commander.core.ComfyUIServer._send_workflow_to_server') as mock_execute:
             mock_execute.return_value = "test-prompt-123"
             
             server = ComfyUIServer()
-            result = workflow.execute(server)
+            result = server.queue(workflow)
             
             assert result == "test-prompt-123"
             mock_execute.assert_called_once_with(api_data, "comfy-commander")
