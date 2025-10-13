@@ -255,45 +255,68 @@ class Workflow:
                     pass
                 break
     
+    def _find_nodes_by_title(self, title: str) -> List[str]:
+        """Find all node IDs that match the given title."""
+        matching_node_ids = []
+        for node_id, node_data in self.api_json.items():
+            if node_data.get("_meta", {}).get("title") == title:
+                matching_node_ids.append(node_id)
+        return matching_node_ids
+    
+    def _find_nodes_by_class_type(self, class_type: str) -> List[str]:
+        """Find all node IDs that match the given class_type."""
+        matching_node_ids = []
+        for node_id, node_data in self.api_json.items():
+            if node_data.get("class_type") == class_type:
+                matching_node_ids.append(node_id)
+        return matching_node_ids
+    
+    def _find_nodes_by_name(self, name: str) -> List[str]:
+        """Find all node IDs that match the given name (class_type)."""
+        return self._find_nodes_by_class_type(name)
+    
+    def _create_node_from_id(self, node_id: str) -> Node:
+        """Create a Node object from a node ID."""
+        return Node(id=node_id, workflow=self)
+    
+    def _create_nodes_from_ids(self, node_ids: List[str]) -> List[Node]:
+        """Create a list of Node objects from a list of node IDs."""
+        return [self._create_node_from_id(node_id) for node_id in node_ids]
+
     def node(self, id: Optional[str] = None, name: Optional[str] = None, 
              title: Optional[str] = None, class_type: Optional[str] = None) -> Node:
         """Get a node by ID, name, title, or class_type."""
         if id is not None:
             if id in self.api_json:
-                return Node(id=id, workflow=self)
+                return self._create_node_from_id(id)
             raise KeyError(f"Node with ID '{id}' not found")
         
         if name is not None:
-            for node_id, node_data in self.api_json.items():
-                if node_data.get("class_type") == name:
-                    return Node(id=node_id, workflow=self)
-            raise KeyError(f"Node with class_type '{name}' not found")
+            matching_node_ids = self._find_nodes_by_name(name)
+            if len(matching_node_ids) == 0:
+                raise KeyError(f"Node with class_type '{name}' not found")
+            elif len(matching_node_ids) > 1:
+                raise ValueError(f"Multiple nodes found with class_type '{name}': {matching_node_ids}. Use node ID to specify which one.")
+            else:
+                return self._create_node_from_id(matching_node_ids[0])
         
         if title is not None:
-            matching_nodes = []
-            for node_id, node_data in self.api_json.items():
-                if node_data.get("_meta", {}).get("title") == title:
-                    matching_nodes.append(node_id)
-            
-            if len(matching_nodes) == 0:
+            matching_node_ids = self._find_nodes_by_title(title)
+            if len(matching_node_ids) == 0:
                 raise KeyError(f"Node with title '{title}' not found")
-            elif len(matching_nodes) > 1:
-                raise ValueError(f"Multiple nodes found with title '{title}': {matching_nodes}. Use node ID to specify which one.")
+            elif len(matching_node_ids) > 1:
+                raise ValueError(f"Multiple nodes found with title '{title}': {matching_node_ids}. Use node ID to specify which one.")
             else:
-                return Node(id=matching_nodes[0], workflow=self)
+                return self._create_node_from_id(matching_node_ids[0])
         
         if class_type is not None:
-            matching_nodes = []
-            for node_id, node_data in self.api_json.items():
-                if node_data.get("class_type") == class_type:
-                    matching_nodes.append(node_id)
-            
-            if len(matching_nodes) == 0:
+            matching_node_ids = self._find_nodes_by_class_type(class_type)
+            if len(matching_node_ids) == 0:
                 raise KeyError(f"Node with class_type '{class_type}' not found")
-            elif len(matching_nodes) > 1:
-                raise ValueError(f"Multiple nodes found with class_type '{class_type}': {matching_nodes}. Use node ID to specify which one.")
+            elif len(matching_node_ids) > 1:
+                raise ValueError(f"Multiple nodes found with class_type '{class_type}': {matching_node_ids}. Use node ID to specify which one.")
             else:
-                return Node(id=matching_nodes[0], workflow=self)
+                return self._create_node_from_id(matching_node_ids[0])
         
         raise ValueError("One of 'id', 'name', 'title', or 'class_type' must be provided")
     
@@ -313,25 +336,15 @@ class Workflow:
         if title is None and class_type is None:
             raise ValueError("Either 'title' or 'class_type' must be provided")
         
-        matching_nodes = []
+        matching_node_ids = set()
         
-        for node_id, node_data in self.api_json.items():
-            match = False
-            
-            if title is not None:
-                node_title = node_data.get("_meta", {}).get("title")
-                if node_title == title:
-                    match = True
-            
-            if class_type is not None:
-                node_class_type = node_data.get("class_type")
-                if node_class_type == class_type:
-                    match = True
-            
-            if match:
-                matching_nodes.append(Node(id=node_id, workflow=self))
+        if title is not None:
+            matching_node_ids.update(self._find_nodes_by_title(title))
         
-        return matching_nodes
+        if class_type is not None:
+            matching_node_ids.update(self._find_nodes_by_class_type(class_type))
+        
+        return self._create_nodes_from_ids(list(matching_node_ids))
     
     def ensure_api_format(self, server: "ComfyUIServer") -> None:
         """Ensure the workflow has proper API format by converting from GUI if needed.
