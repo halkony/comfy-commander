@@ -1,0 +1,6 @@
+-r ./base.txt
+
+pytest
+pytest-asyncio
+pytest-sugar
+syrupy
