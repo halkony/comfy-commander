@@ -30,14 +30,10 @@ from comfy_commander import ComfyUIServer, Workflow
 server = ComfyUIServer("http://localhost:8188")
 workflow = Workflow.from_file("./workflow.json")
 
-async def main():
-    # Execute and wait for completion (returns ExecutionResult with images)
-    result = await server.execute(workflow)
-    for i, image in enumerate(result.media):
-        image.save(f"./image_{i}.png")
+result = server.execute(workflow)
+for i, image in enumerate(result.media):
+    image.save(f"./image_{i}.png")
 
-if __name__ == "__main__":
-    asyncio.run(main)
 ```
 
 ### Queue for Later Processing

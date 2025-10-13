@@ -27,6 +27,10 @@ class ComfyImage:
         image = Image.open(io.BytesIO(self.data))
         image.save(filepath)
     
+    def __repr__(self) -> str:
+        """Compact string representation."""
+        return f"ComfyImage(filename='{self.filename}', size={len(self.data)} bytes, type='{self.type}')"
+    
     @classmethod
     def from_base64(cls, base64_data: str, filename: str = "", subfolder: str = "", type: str = "output") -> "ComfyImage":
         """Create a ComfyImage from base64 encoded data."""
@@ -42,6 +46,12 @@ class ExecutionResult:
     media: List[ComfyImage] = attrs.field(default=attrs.Factory(list))
     status: str = attrs.field(default="success")
     error_message: Optional[str] = attrs.field(default=None)
+    
+    def __repr__(self) -> str:
+        """Compact string representation."""
+        media_info = f"{len(self.media)} images" if self.media else "no images"
+        error_info = f", error='{self.error_message}'" if self.error_message else ""
+        return f"ExecutionResult(prompt_id='{self.prompt_id}', status='{self.status}', {media_info}{error_info})"
 
 
 @attrs.define
@@ -403,6 +413,11 @@ class Workflow:
             api_data = server.convert_workflow(self.gui_json)
             self.api_json = api_data
     
+    def __repr__(self) -> str:
+        """Compact string representation."""
+        api_nodes = len(self.api_json) if self.api_json else 0
+        gui_nodes = len(self.gui_json.get("nodes", [])) if self.gui_json else 0
+        return f"Workflow(api_nodes={api_nodes}, gui_nodes={gui_nodes})"
     
     def __eq__(self, other: Any) -> bool:
         """Compare workflows for equality."""
