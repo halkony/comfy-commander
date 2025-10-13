@@ -8,6 +8,14 @@ asttokens==3.0.0
     # via stack-data
 attrs==25.4.0
     # via -r requirements/base.txt
+certifi==2025.10.5
+    # via
+    #   -r requirements/base.txt
+    #   requests
+charset-normalizer==3.4.3
+    # via
+    #   -r requirements/base.txt
+    #   requests
 colorama==0.4.6
     # via
     #   ipython
@@ -16,6 +24,10 @@ decorator==5.2.1
     # via ipython
 executing==2.2.1
     # via stack-data
+idna==3.11
+    # via
+    #   -r requirements/base.txt
+    #   requests
 iniconfig==2.1.0
     # via pytest
 ipython==9.6.0
@@ -53,6 +65,8 @@ pytest-asyncio==1.2.0
     # via -r requirements/dev.in
 pytest-sugar==1.1.1
     # via -r requirements/dev.in
+requests==2.32.5
+    # via -r requirements/base.txt
 stack-data==0.6.3
     # via ipython
 syrupy==5.0.0
@@ -65,5 +79,9 @@ traitlets==5.14.3
     #   matplotlib-inline
 typing-extensions==4.15.0
     # via pytest-asyncio
+urllib3==2.5.0
+    # via
+    #   -r requirements/base.txt
+    #   requests
 wcwidth==0.2.14
     # via prompt-toolkit

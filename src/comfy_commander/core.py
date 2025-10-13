@@ -3,6 +3,7 @@ Core functionality for Comfy Commander.
 """
 
 import json
+import requests
 from typing import Dict, Any, Optional, List, Union
 
 import attrs
@@ -107,15 +108,48 @@ class Workflow:
         pass
     
     @classmethod
-    def from_file(cls, file_path: str) -> "Workflow":
-        """Load a workflow from a JSON file (API format)."""
-        with open(file_path, 'r') as f:
-            api_data = json.load(f)
+    def from_file(cls, file_path: str, server: Optional["ComfyUIServer"] = None) -> "Workflow":
+        """Load a workflow from a JSON file, automatically detecting format.
         
-        # Create a minimal GUI JSON structure
-        gui_data = cls._create_gui_from_api(api_data)
+        Args:
+            file_path: Path to the workflow JSON file
+            server: Optional ComfyUI server instance for conversion if needed
+            
+        Returns:
+            Workflow instance with both API and GUI data
+        """
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # Detect if this is a standard workflow (has 'nodes' and 'links' keys)
+        if 'nodes' in data and 'links' in data:
+            # Standard workflow format
+            gui_data = data
+            if server:
+                # Convert to API format using server
+                api_data = server.convert_workflow(gui_data)
+            else:
+                # Create minimal API structure (will need server for actual conversion)
+                api_data = cls._create_minimal_api_from_gui(gui_data)
+        else:
+            # API workflow format
+            api_data = data
+            gui_data = cls._create_gui_from_api(api_data)
         
         return cls(api_json=api_data, gui_json=gui_data)
+    
+    @classmethod
+    def _create_minimal_api_from_gui(cls, gui_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a minimal API structure from GUI data (placeholder until server conversion)."""
+        api_data = {}
+        for node in gui_data.get("nodes", []):
+            node_id = str(node["id"])
+            api_data[node_id] = {
+                "class_type": node.get("type", ""),
+                "inputs": {},
+                "_meta": {"title": node.get("title", "")}
+            }
+        return api_data
     
     @classmethod
     def from_image(cls, file_path: str) -> "Workflow":
@@ -256,8 +290,146 @@ class Workflow:
         
         raise ValueError("One of 'id', 'name', 'title', or 'class_type' must be provided")
     
+    def ensure_api_format(self, server: "ComfyUIServer") -> None:
+        """Ensure the workflow has proper API format by converting from GUI if needed.
+        
+        Args:
+            server: ComfyUI server instance for conversion
+            
+        Raises:
+            ConnectionError: If server is not available
+            requests.RequestException: If conversion fails
+        """
+        # Check if we have a minimal API structure (from standard workflow without server)
+        if not self.api_json or not any(
+            node_data.get("inputs") for node_data in self.api_json.values()
+        ):
+            # Need to convert from GUI format
+            if not server.is_available():
+                raise ConnectionError("ComfyUI server is not available for workflow conversion")
+            
+            # Convert using server
+            api_data = server.convert_workflow(self.gui_json)
+            self.api_json = api_data
+    
+    def execute(self, server: "ComfyUIServer", client_id: str = "comfy-commander") -> str:
+        """Execute this workflow on the server.
+        
+        Args:
+            server: ComfyUI server instance
+            client_id: Client identifier for the execution
+            
+        Returns:
+            Prompt ID for tracking the execution
+            
+        Raises:
+            ConnectionError: If server is not available
+            requests.RequestException: If execution fails
+        """
+        # Ensure we have proper API format
+        self.ensure_api_format(server)
+        
+        # Execute the workflow
+        return server.execute_workflow(self.api_json, client_id)
+    
     def __eq__(self, other: Any) -> bool:
         """Compare workflows for equality."""
         if not isinstance(other, Workflow):
             return False
         return self.api_json == other.api_json and self.gui_json == other.gui_json
+
+
+@attrs.define
+class ComfyUIServer:
+    """Handles communication with a local ComfyUI server."""
+    
+    base_url: str = attrs.field(default="http://localhost:8188")
+    timeout: int = attrs.field(default=30)
+    
+    def __attrs_post_init__(self):
+        """Initialize after attrs initialization."""
+        # Ensure base_url doesn't end with trailing slash
+        self.base_url = self.base_url.rstrip('/')
+    
+    def is_available(self) -> bool:
+        """Check if the ComfyUI server is available."""
+        try:
+            response = requests.get(f"{self.base_url}/system_stats", timeout=5)
+            return response.status_code == 200
+        except requests.RequestException:
+            return False
+    
+    def convert_workflow(self, workflow_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert a standard workflow to API format using the /workflow/convert endpoint.
+        
+        Args:
+            workflow_data: Standard workflow JSON data
+            
+        Returns:
+            API format workflow data
+            
+        Raises:
+            requests.RequestException: If the conversion request fails
+        """
+        response = requests.post(
+            f"{self.base_url}/workflow/convert",
+            json=workflow_data,
+            timeout=self.timeout
+        )
+        response.raise_for_status()
+        return response.json()
+    
+    def execute_workflow(self, api_workflow: Dict[str, Any], client_id: str = "comfy-commander") -> str:
+        """Execute an API format workflow on the server.
+        
+        Args:
+            api_workflow: API format workflow data
+            client_id: Client identifier for the execution
+            
+        Returns:
+            Prompt ID for tracking the execution
+            
+        Raises:
+            requests.RequestException: If the execution request fails
+        """
+        response = requests.post(
+            f"{self.base_url}/prompt",
+            json={"prompt": api_workflow, "client_id": client_id},
+            timeout=self.timeout
+        )
+        response.raise_for_status()
+        return response.json()["prompt_id"]
+    
+    def get_queue_status(self) -> Dict[str, Any]:
+        """Get the current queue status from the server.
+        
+        Returns:
+            Queue status information
+            
+        Raises:
+            requests.RequestException: If the request fails
+        """
+        response = requests.get(f"{self.base_url}/queue", timeout=self.timeout)
+        response.raise_for_status()
+        return response.json()
+    
+    def get_history(self, prompt_id: Optional[str] = None) -> Dict[str, Any]:
+        """Get execution history from the server.
+        
+        Args:
+            prompt_id: Optional specific prompt ID to get history for
+            
+        Returns:
+            History information
+            
+        Raises:
+            requests.RequestException: If the request fails
+        """
+        url = f"{self.base_url}/history"
+        if prompt_id:
+            url += f"/{prompt_id}"
+        
+        response = requests.get(url, timeout=self.timeout)
+        response.raise_for_status()
+        return response.json()
+

@@ -1,25 +1,73 @@
 Comfy Commander is a package for programmatically running ComfyUI workloads either locally or remotely
  - Edit any node and its values from Python
  - Supports Local and RunPod ComfyUI instances
+ - Convert standard ComfyUI workflows to API format
+ - Execute workflows on local ComfyUI servers
 
 ## Quickstart
-```python
-import asyncio
-from comfy_commander import LocalServer, Workflow, random_seed
 
-local_server = LocalServer("http://localhost:8188/")
+### Basic Workflow Usage
+```python
+from comfy_commander.core import Workflow
+
+# Load an API format workflow
 workflow = Workflow.from_file("./image_workflow.json")
 
-# sets a new seed everytime the workflow is run
-workflow.node(id=3).property("seed") = random_seed()
-# sets the prompt
-workflow.node(name="Positive Prompt").property("text") = "A beautiful woman with blonde hair"
+# Modify node parameters
+sampler_node = workflow.node(id="31")
+sampler_node.param("seed").set(1234567890)
+sampler_node.param("steps").set(8)
 
-async def main():
-    result = await workflow.run()
-    for i, image in enumerate(result.media):
-        image.save(f"path/image_{i}.png")
-    
-if __name__ == "main":
-    asyncio.run(main)
+# Access node properties
+print(f"Current seed: {sampler_node.param('seed').value}")
+```
+
+### Direct Execution
+```python
+from comfy_commander.core import ComfyUIServer, Workflow
+
+server = ComfyUIServer("http://localhost:8188")
+workflow = Workflow.from_file("./workflow.json", server)
+
+# Convert and execute in one step
+prompt_id = workflow.execute(server)
+print(f"Workflow executed with prompt ID: {prompt_id}")
+```
+
+## Requirements
+
+### For Standard Workflow Conversion
+To convert standard ComfyUI workflows to API format, you need:
+
+1. **ComfyUI running locally** on `http://localhost:8188`
+2. **Workflow Converter Extension** installed:
+   ```bash
+   cd ComfyUI/custom_nodes
+   git clone https://github.com/SethRobinson/comfyui-workflow-to-api-converter-endpoint
+   ```
+   Then restart ComfyUI.
+
+## Testing
+
+### Unit Tests (Default)
+```bash
+# Runs all unit tests by default (e2e tests are in separate files)
+pytest tests/ -v
+```
+
+### End-to-End Tests
+```bash
+# Make sure ComfyUI is running with the converter extension
+python run_e2e_tests.py
+```
+
+Or run e2e tests directly:
+```bash
+pytest tests/e2e_test_local_server.py -v
+```
+
+### All Tests (Including E2E)
+```bash
+# Run all tests including e2e (requires running ComfyUI instance)
+pytest tests/ tests/e2e_test_local_server.py -v
 ```
