@@ -42,8 +42,11 @@ class ComfyImage:
             pnginfo = PngInfo()
             
             # Store prompt and workflow as separate text chunks
-            pnginfo.add_text('prompt', json.dumps(workflow_to_use.api_json, ensure_ascii=False))
-            pnginfo.add_text('workflow', json.dumps(workflow_to_use.gui_json, ensure_ascii=False))
+            # Only store the data that actually exists
+            if workflow_to_use.api_json is not None:
+                pnginfo.add_text('prompt', json.dumps(workflow_to_use.api_json, ensure_ascii=False))
+            if workflow_to_use.gui_json is not None:
+                pnginfo.add_text('workflow', json.dumps(workflow_to_use.gui_json, ensure_ascii=False))
             
             # Save the image with embedded metadata
             image.save(filepath, format='PNG', pnginfo=pnginfo)
@@ -131,20 +134,21 @@ class Node:
     
     def get_property_value(self, property_name: str) -> Any:
         """Get a property value from the API JSON format."""
-        if self.id in self.workflow.api_json:
+        if self.workflow.api_json and self.id in self.workflow.api_json:
             return self.workflow.api_json[self.id].get("inputs", {}).get(property_name)
         return None
     
     def set_property_value(self, property_name: str, value: Any) -> None:
         """Set a property value in both API JSON and GUI JSON formats."""
-        # Update API JSON
-        if self.id in self.workflow.api_json:
+        # Update API JSON if it exists
+        if self.workflow.api_json and self.id in self.workflow.api_json:
             if "inputs" not in self.workflow.api_json[self.id]:
                 self.workflow.api_json[self.id]["inputs"] = {}
             self.workflow.api_json[self.id]["inputs"][property_name] = value
         
         # Update GUI JSON - find the corresponding node and update widgets_values
-        self.workflow._sync_property_to_gui(self.id, property_name, value)
+        if self.workflow.gui_json:
+            self.workflow._sync_property_to_gui(self.id, property_name, value)
     
     def param(self, name: str) -> PropertyAccessor:
         """Get a parameter accessor for the node's inputs."""
@@ -153,14 +157,14 @@ class Node:
     @property
     def class_type(self) -> str:
         """Get the class type from API JSON."""
-        if self.id in self.workflow.api_json:
+        if self.workflow.api_json and self.id in self.workflow.api_json:
             return self.workflow.api_json[self.id].get("class_type", "")
         return ""
     
     @property
     def title(self) -> str:
         """Get the title from API JSON metadata."""
-        if self.id in self.workflow.api_json:
+        if self.workflow.api_json and self.id in self.workflow.api_json:
             return self.workflow.api_json[self.id].get("_meta", {}).get("title", "")
         return ""
 
@@ -184,38 +188,26 @@ class Workflow:
             file_path: Path to the workflow JSON file
             
         Returns:
-            Workflow instance with both API and GUI data. If loading a standard
-            workflow format, the API data will be minimal and conversion will
-            happen automatically at execution time.
+            Workflow instance with only the source format populated. For standard
+            workflows, only gui_json will be populated. For API workflows, only
+            api_json will be populated. The other format will be None until
+            conversion happens at execution time.
         """
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
         # Detect if this is a standard workflow (has 'nodes' and 'links' keys)
         if 'nodes' in data and 'links' in data:
-            # Standard workflow format
+            # Standard workflow format - only populate GUI data
             gui_data = data
-            # Create minimal API structure (will need server for actual conversion)
-            api_data = cls._create_minimal_api_from_gui(gui_data)
+            api_data = None
         else:
-            # API workflow format
+            # API workflow format - only populate API data
             api_data = data
-            gui_data = cls._create_gui_from_api(api_data)
+            gui_data = None
         
         return cls(api_json=api_data, gui_json=gui_data)
     
-    @classmethod
-    def _create_minimal_api_from_gui(cls, gui_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a minimal API structure from GUI data (placeholder until server conversion)."""
-        api_data = {}
-        for node in gui_data.get("nodes", []):
-            node_id = str(node["id"])
-            api_data[node_id] = {
-                "class_type": node.get("type", ""),
-                "inputs": {},
-                "_meta": {"title": node.get("title", "")}
-            }
-        return api_data
     
     @classmethod
     def from_image(cls, file_path: str) -> "Workflow":
@@ -225,12 +217,12 @@ class Workflow:
             prompt_json = image.info.get('prompt')
             workflow_json = image.info.get('workflow')
             
-            if prompt_json is None or workflow_json is None:
+            if prompt_json is None and workflow_json is None:
                 raise ValueError(f"No ComfyUI workflow metadata found in image: {file_path}")
             
-            # Parse the JSON metadata
-            api_data = json.loads(prompt_json)
-            gui_data = json.loads(workflow_json)
+            # Parse the JSON metadata (only if present)
+            api_data = json.loads(prompt_json) if prompt_json else None
+            gui_data = json.loads(workflow_json) if workflow_json else None
         
         return cls(api_json=api_data, gui_json=gui_data)
     
@@ -297,7 +289,7 @@ class Workflow:
         for node in self.gui_json.get("nodes", []):
             if str(node["id"]) == node_id:
                 # Find the position of this property in the widgets_values
-                api_node = self.api_json.get(node_id, {})
+                api_node = self.api_json.get(node_id, {}) if self.api_json else {}
                 inputs = api_node.get("inputs", {})
                 
                 # Get the order of non-connection inputs
@@ -329,17 +321,19 @@ class Workflow:
     def _find_nodes_by_title(self, title: str) -> List[str]:
         """Find all node IDs that match the given title."""
         matching_node_ids = []
-        for node_id, node_data in self.api_json.items():
-            if node_data.get("_meta", {}).get("title") == title:
-                matching_node_ids.append(node_id)
+        if self.api_json:
+            for node_id, node_data in self.api_json.items():
+                if node_data.get("_meta", {}).get("title") == title:
+                    matching_node_ids.append(node_id)
         return matching_node_ids
     
     def _find_nodes_by_class_type(self, class_type: str) -> List[str]:
         """Find all node IDs that match the given class_type."""
         matching_node_ids = []
-        for node_id, node_data in self.api_json.items():
-            if node_data.get("class_type") == class_type:
-                matching_node_ids.append(node_id)
+        if self.api_json:
+            for node_id, node_data in self.api_json.items():
+                if node_data.get("class_type") == class_type:
+                    matching_node_ids.append(node_id)
         return matching_node_ids
     
     def _find_nodes_by_name(self, name: str) -> List[str]:
@@ -358,7 +352,7 @@ class Workflow:
              title: Optional[str] = None, class_type: Optional[str] = None) -> Node:
         """Get a node by ID, name, title, or class_type."""
         if id is not None:
-            if id in self.api_json:
+            if self.api_json and id in self.api_json:
                 return self._create_node_from_id(id)
             raise KeyError(f"Node with ID '{id}' not found")
         
@@ -427,14 +421,10 @@ class Workflow:
             ConnectionError: If server is not available
             requests.RequestException: If conversion fails
         """
-        # Check if this is a minimal API structure (created from GUI format)
-        # by looking for nodes with empty inputs but non-empty gui_json
+        # Check if we need to convert from GUI format to API format
         needs_conversion = (
-            self.gui_json and  # Has GUI data
-            len(self.api_json) > 0 and  # Has API data with nodes
-            not any(
-                node_data.get("inputs") for node_data in self.api_json.values()
-            )  # But API data has no inputs (minimal structure)
+            self.gui_json is not None and  # Has GUI data
+            self.api_json is None  # No API data yet
         )
         
         if needs_conversion:
@@ -535,10 +525,11 @@ class ComfyUIServer:
             requests.RequestException: If the execution request fails
         """
         # Filter out non-executable nodes (like Note, Reroute, etc.)
+        filtered_workflow = self._filter_executable_nodes(api_workflow)
         
         response = requests.post(
             f"{self.base_url}/prompt",
-            json={"prompt": api_workflow, "client_id": client_id},
+            json={"prompt": filtered_workflow, "client_id": client_id},
             timeout=self.timeout
         )
         response.raise_for_status()

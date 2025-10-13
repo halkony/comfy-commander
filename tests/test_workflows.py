@@ -180,8 +180,29 @@ class TestWorkflows:
 
     def test_can_load_workflow_from_example_image(self, snapshot, example_image_file_path):
         workflow = Workflow.from_image(example_image_file_path)
+        # Both formats should be populated when loading from image
+        assert workflow.api_json is not None
+        assert workflow.gui_json is not None
         workflow.api_json == snapshot
         workflow.gui_json == snapshot
+    
+    def test_can_load_standard_workflow_from_file(self, example_standard_workflow_file_path):
+        """Test that loading a standard workflow file only populates gui_json."""
+        workflow = Workflow.from_file(example_standard_workflow_file_path)
+        # Standard workflow should only have GUI data
+        assert workflow.gui_json is not None
+        assert workflow.api_json is None
+        assert "nodes" in workflow.gui_json
+        assert "links" in workflow.gui_json
+    
+    def test_can_load_api_workflow_from_file(self, example_api_workflow_file_path):
+        """Test that loading an API workflow file only populates api_json."""
+        workflow = Workflow.from_file(example_api_workflow_file_path)
+        # API workflow should only have API data
+        assert workflow.api_json is not None
+        assert workflow.gui_json is None
+        assert "6" in workflow.api_json  # Should have nodes
+        assert "class_type" in workflow.api_json["6"]
     
     def test_dual_workflow_synchronization_api_to_gui(self, example_image_file_path):
         """Test that changes to API JSON are synchronized to GUI JSON."""

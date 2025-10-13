@@ -170,7 +170,7 @@ class TestWorkflow:
         workflow = Workflow.from_file(str(file_path))
         
         assert workflow.api_json == api_data
-        assert "nodes" in workflow.gui_json  # Should have created GUI structure
+        assert workflow.gui_json is None  # Should not create GUI structure
     
     def test_from_file_standard_format(self, tmp_path):
         """Test loading standard format workflow from file."""
@@ -183,8 +183,7 @@ class TestWorkflow:
         workflow = Workflow.from_file(str(file_path))
         
         assert workflow.gui_json == gui_data
-        assert workflow.api_json  # Should have created minimal API structure
-        assert "6" in workflow.api_json
+        assert workflow.api_json is None  # Should not create API structure
     
     def test_ensure_api_format_with_conversion(self, tmp_path):
         """Test ensuring API format when conversion is needed."""
@@ -194,7 +193,7 @@ class TestWorkflow:
         with open(file_path, 'w') as f:
             json.dump(gui_data, f)
         
-        workflow = Workflow.from_file(str(file_path))  # This will create minimal API
+        workflow = Workflow.from_file(str(file_path))  # This will only populate gui_json
         
         with patch('comfy_commander.core.ComfyUIServer.is_available', return_value=True), \
              patch('comfy_commander.core.ComfyUIServer.convert_workflow') as mock_convert:

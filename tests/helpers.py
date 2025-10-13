@@ -9,6 +9,8 @@ from comfy_commander import Workflow
 
 def find_gui_node_by_id(workflow: Workflow, node_id: int) -> Optional[Dict[str, Any]]:
     """Helper function to find a GUI node by its ID."""
+    if workflow.gui_json is None:
+        return None
     for node in workflow.gui_json["nodes"]:
         if node["id"] == node_id:
             return node
@@ -17,6 +19,7 @@ def find_gui_node_by_id(workflow: Workflow, node_id: int) -> Optional[Dict[str, 
 
 def assert_api_param_updated(workflow: Workflow, node_id: str, param_name: str, expected_value: Any) -> None:
     """Helper function to assert that an API parameter was updated."""
+    assert workflow.api_json is not None, "API JSON is None, cannot check parameter"
     assert workflow.api_json[node_id]["inputs"][param_name] == expected_value
 
 
@@ -29,6 +32,7 @@ def assert_gui_widget_updated(workflow: Workflow, node_id: int, widget_index: in
 
 def assert_connections_preserved(workflow: Workflow, node_id: str, expected_connections: list) -> None:
     """Helper function to assert that node connections are preserved."""
+    assert workflow.api_json is not None, "API JSON is None, cannot check connections"
     for connection in expected_connections:
         assert connection in workflow.api_json[node_id]["inputs"], f"Connection '{connection}' not found"
 

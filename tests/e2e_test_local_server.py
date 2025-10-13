@@ -79,7 +79,8 @@ class TestComfyUIServerE2E:
         
         # Verify workflow loaded
         assert isinstance(workflow, Workflow)
-        assert len(workflow.api_json) > 0
+        assert workflow.gui_json is not None  # Standard workflow should have GUI data
+        assert workflow.api_json is None  # API data should be None until conversion
         
         # Queue the workflow (conversion will happen here)
         prompt_id = server.queue(workflow, "comfy-commander-test")
@@ -100,7 +101,10 @@ class TestComfyUIServerE2E:
             "tests/fixtures/flux_dev_checkpoint_example_standard.json"
         )
         
-        # Modify parameters
+        # First, ensure the workflow is converted to API format
+        workflow.ensure_api_format(server)
+        
+        # Now modify parameters
         sampler_node = workflow.node(id="31")
         original_seed = sampler_node.param("seed").value
         new_seed = 1234567890
@@ -109,6 +113,8 @@ class TestComfyUIServerE2E:
         
         # Verify the change
         assert sampler_node.param("seed").value == new_seed
+        # After conversion, api_json should be populated
+        assert workflow.api_json is not None
         assert workflow.api_json["31"]["inputs"]["seed"] == new_seed
         
         # Verify the change is reflected in GUI JSON as well
