@@ -9,6 +9,11 @@ description = "A package for programmatically running ComfyUI workloads either l
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
+dependencies = [
+    "requests>=2.32.0",
+    "pillow>=11.0.0",
+    "attrs>=25.0.0",
+]
 authors = [
     {name = "Nathan Halko", email = "nathan@halko.us"},
 ]
@@ -28,9 +33,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/comfy-commander"
-Repository = "https://github.com/yourusername/comfy-commander"
-Issues = "https://github.com/yourusername/comfy-commander/issues"
+Homepage = "https://github.com/halkony/comfy-commander"
+Repository = "https://github.com/halkony/comfy-commander"
+Issues = "https://github.com/halkony/comfy-commander/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
