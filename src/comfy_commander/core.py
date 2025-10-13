@@ -270,10 +270,17 @@ class Workflow:
             raise KeyError(f"Node with class_type '{name}' not found")
         
         if title is not None:
+            matching_nodes = []
             for node_id, node_data in self.api_json.items():
                 if node_data.get("_meta", {}).get("title") == title:
-                    return Node(id=node_id, workflow=self)
-            raise KeyError(f"Node with title '{title}' not found")
+                    matching_nodes.append(node_id)
+            
+            if len(matching_nodes) == 0:
+                raise KeyError(f"Node with title '{title}' not found")
+            elif len(matching_nodes) > 1:
+                raise ValueError(f"Multiple nodes found with title '{title}': {matching_nodes}. Use node ID to specify which one.")
+            else:
+                return Node(id=matching_nodes[0], workflow=self)
         
         if class_type is not None:
             matching_nodes = []
@@ -289,6 +296,42 @@ class Workflow:
                 return Node(id=matching_nodes[0], workflow=self)
         
         raise ValueError("One of 'id', 'name', 'title', or 'class_type' must be provided")
+    
+    def nodes(self, title: Optional[str] = None, class_type: Optional[str] = None) -> List[Node]:
+        """Get all nodes that match the given title or class_type.
+        
+        Args:
+            title: Title to match (exact match)
+            class_type: Class type to match (exact match)
+            
+        Returns:
+            List of Node objects that match the criteria
+            
+        Raises:
+            ValueError: If neither title nor class_type is provided
+        """
+        if title is None and class_type is None:
+            raise ValueError("Either 'title' or 'class_type' must be provided")
+        
+        matching_nodes = []
+        
+        for node_id, node_data in self.api_json.items():
+            match = False
+            
+            if title is not None:
+                node_title = node_data.get("_meta", {}).get("title")
+                if node_title == title:
+                    match = True
+            
+            if class_type is not None:
+                node_class_type = node_data.get("class_type")
+                if node_class_type == class_type:
+                    match = True
+            
+            if match:
+                matching_nodes.append(Node(id=node_id, workflow=self))
+        
+        return matching_nodes
     
     def ensure_api_format(self, server: "ComfyUIServer") -> None:
         """Ensure the workflow has proper API format by converting from GUI if needed.
