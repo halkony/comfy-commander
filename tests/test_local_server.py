@@ -186,24 +186,6 @@ class TestWorkflow:
         assert workflow.api_json  # Should have created minimal API structure
         assert "6" in workflow.api_json
     
-    def test_from_file_standard_format_with_server(self, tmp_path):
-        """Test loading standard format workflow with server conversion."""
-        gui_data = {"nodes": [], "links": []}
-        file_path = tmp_path / "workflow.json"
-        
-        with open(file_path, 'w') as f:
-            json.dump(gui_data, f)
-        
-        with patch('comfy_commander.core.ComfyUIServer.convert_workflow') as mock_convert:
-            mock_convert.return_value = {"6": {"inputs": {"text": "test"}, "class_type": "CLIPTextEncode"}}
-            
-            server = ComfyUIServer()
-            workflow = Workflow.from_file(str(file_path), server)
-            
-            assert workflow.gui_json == gui_data
-            assert workflow.api_json == {"6": {"inputs": {"text": "test"}, "class_type": "CLIPTextEncode"}}
-            mock_convert.assert_called_once_with(gui_data)
-    
     def test_ensure_api_format_with_conversion(self, tmp_path):
         """Test ensuring API format when conversion is needed."""
         gui_data = {"nodes": [{"id": 6, "type": "CLIPTextEncode"}], "links": []}
@@ -226,7 +208,8 @@ class TestWorkflow:
     
     def test_ensure_api_format_server_unavailable(self, tmp_path):
         """Test ensuring API format when server is unavailable."""
-        gui_data = {"nodes": [], "links": []}
+        # Create a workflow that actually needs conversion (has nodes but no inputs)
+        gui_data = {"nodes": [{"id": 6, "type": "CLIPTextEncode"}], "links": []}
         file_path = tmp_path / "workflow.json"
         
         with open(file_path, 'w') as f:

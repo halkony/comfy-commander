@@ -74,19 +74,14 @@ class TestComfyUIServerE2E:
         """Test loading a standard workflow, converting it, and executing it."""
         # Load standard workflow with server for automatic conversion
         workflow = Workflow.from_file(
-            "tests/fixtures/flux_dev_checkpoint_example_standard.json",
-            server
+            "tests/fixtures/flux_dev_checkpoint_example_standard.json"
         )
         
-        # Verify conversion
+        # Verify workflow loaded
         assert isinstance(workflow, Workflow)
         assert len(workflow.api_json) > 0
         
-        # Modify a parameter to make execution faster
-        sampler_node = workflow.node(id="31")
-        sampler_node.param("steps").set(1)  # Reduce steps for faster execution
-        
-        # Queue the workflow
+        # Queue the workflow (conversion will happen here)
         prompt_id = server.queue(workflow, "comfy-commander-test")
         
         # Verify execution started
@@ -98,27 +93,11 @@ class TestComfyUIServerE2E:
         assert "queue_running" in queue_status
         assert "queue_pending" in queue_status
     
-    def test_standard_workflow_direct_execution(self, server):
-        """Test direct execution of a standard workflow."""
-        # Load standard workflow with server
-        workflow = Workflow.from_file(
-            "tests/fixtures/flux_dev_checkpoint_example_standard.json",
-            server
-        )
-        
-        # Queue directly (converts and queues in one step)
-        prompt_id = server.queue(workflow, "comfy-commander-direct-test")
-        
-        # Verify execution started
-        assert isinstance(prompt_id, str)
-        assert len(prompt_id) > 0
-    
     def test_workflow_parameter_modification_after_conversion(self, server):
         """Test modifying workflow parameters after conversion."""
         # Load and convert standard workflow
         workflow = Workflow.from_file(
-            "tests/fixtures/flux_dev_checkpoint_example_standard.json",
-            server
+            "tests/fixtures/flux_dev_checkpoint_example_standard.json"
         )
         
         # Modify parameters
@@ -203,7 +182,17 @@ class TestComfyUIServerE2E:
         if result.status == "success":
             # If successful, we should have some media
             assert isinstance(result.media, list)
-            # Note: We don't assert that media is non-empty because the workflow might not generate images
+            
+            # This workflow should produce images (it has a SaveImage node)
+            # So we expect at least one image in the result
+            assert len(result.media) > 0, "Workflow should produce at least one image but result.media is empty"
+            
+            # Verify that the images are valid ComfyImage objects
+            for i, image in enumerate(result.media):
+                assert hasattr(image, 'data'), f"Image {i} should have data attribute"
+                assert hasattr(image, 'filename'), f"Image {i} should have filename attribute"
+                assert len(image.data) > 0, f"Image {i} should have non-empty data"
+                assert image.filename, f"Image {i} should have a filename"
         else:
             # If there was an error, we should have an error message
             assert result.error_message is not None
@@ -235,6 +224,61 @@ class TestComfyUIServerE2E:
         history = server.get_history(prompt_id)
         assert isinstance(history, dict)
 
+    def test_workflow_execute_sync_with_wait_e2e(self, server):
+        """Test synchronous workflow execution with waiting for completion."""
+        # Skip if server is not available
+        if not server.is_available():
+            pytest.skip("ComfyUI server is not available")
+        
+        # Load a simple workflow
+        workflow_path = "tests/fixtures/flux_dev_checkpoint_example_api.json"
+        
+        if not os.path.exists(workflow_path):
+            pytest.skip(f"Test workflow file not found: {workflow_path}")
+        
+        # Load the workflow
+        workflow = Workflow.from_file(workflow_path)
+        
+        # Modify the workflow to use minimal steps for faster execution
+        try:
+            sampler_nodes = workflow.nodes(class_type="KSampler")
+            if sampler_nodes:
+                sampler_nodes[0].param("seed").set(12345)
+                sampler_nodes[0].param("steps").set(1)  # Minimal steps for faster execution
+        except Exception:
+            # If we can't modify the workflow, that's okay for this test
+            pass
+        
+        # Execute the workflow synchronously and wait for completion
+        result = server.execute(workflow, timeout=60.0)
+        
+        # Verify the result
+        assert isinstance(result, ExecutionResult)
+        assert result.prompt_id is not None
+        assert len(result.prompt_id) > 0
+        
+        # The status should be either success or error
+        assert result.status in ["success", "error"]
+        
+        if result.status == "success":
+            # If successful, we should have some media
+            assert isinstance(result.media, list)
+            
+            # This workflow should produce images (it has a SaveImage node)
+            # So we expect at least one image in the result
+            assert len(result.media) > 0, "Workflow should produce at least one image but result.media is empty"
+            
+            # Verify that the images are valid ComfyImage objects
+            for i, image in enumerate(result.media):
+                assert hasattr(image, 'data'), f"Image {i} should have data attribute"
+                assert hasattr(image, 'filename'), f"Image {i} should have filename attribute"
+                assert len(image.data) > 0, f"Image {i} should have non-empty data"
+                assert image.filename, f"Image {i} should have a filename"
+        else:
+            # If there was an error, we should have an error message
+            assert result.error_message is not None
+            assert len(result.error_message) > 0
+
     @pytest.mark.asyncio
     async def test_image_save_functionality_e2e(self, server):
         """Test that generated images can be saved to files."""
@@ -253,6 +297,7 @@ class TestComfyUIServerE2E:
         
         # Execute the workflow asynchronously
         result = await server.execute(workflow, timeout=60.0)
+        assert len(result.media) > 0, "No images produced"
         
         # If we have images, test saving them
         if result.status == "success" and result.media:
@@ -309,4 +354,64 @@ class TestComfyUIServerE2E:
             saved_image = Image.open(output_path)
             assert saved_image.size == (100, 100)
             assert saved_image.mode == 'RGB'
+            saved_image.close()
+
+    def test_comfy_image_metadata_embedding_e2e(self):
+        """Test ComfyImage metadata embedding functionality end-to-end."""
+        # Create a simple test image
+        from PIL import Image
+        import io
+        
+        # Create a 100x100 test image
+        test_image = Image.new('RGB', (100, 100), color='blue')
+        img_bytes = io.BytesIO()
+        test_image.save(img_bytes, format='PNG')
+        img_data = img_bytes.getvalue()
+        
+        # Create a test workflow
+        test_workflow = Workflow(
+            api_json={"1": {"class_type": "TestNode", "inputs": {"test": "e2e_value"}}},
+            gui_json={"nodes": [{"id": 1, "type": "TestNode"}]}
+        )
+        
+        # Create ComfyImage with workflow reference
+        comfy_image = ComfyImage(
+            data=img_data,
+            filename="test_e2e_metadata.png",
+            subfolder="output",
+            type="output"
+        )
+        comfy_image._workflow = test_workflow
+        
+        # Test saving to file with metadata
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = os.path.join(temp_dir, "test_e2e_metadata_output.png")
+            comfy_image.save(output_path)
+            
+            # Verify the file was created
+            assert os.path.exists(output_path)
+            assert os.path.getsize(output_path) > 0
+            
+            # Verify the image can be opened and has the correct properties
+            saved_image = Image.open(output_path)
+            assert saved_image.size == (100, 100)
+            assert saved_image.mode == 'RGB'
+            
+            # Verify workflow metadata is embedded in image.info
+            assert 'prompt' in saved_image.info
+            assert 'workflow' in saved_image.info
+            
+            # Parse the metadata
+            prompt_data = json.loads(saved_image.info['prompt'])
+            workflow_data = json.loads(saved_image.info['workflow'])
+            
+            # Verify the metadata structure
+            assert prompt_data == test_workflow.api_json
+            assert workflow_data == test_workflow.gui_json
+            
+            # Test loading the workflow back from the image
+            loaded_workflow = Workflow.from_image(output_path)
+            assert loaded_workflow.api_json == test_workflow.api_json
+            assert loaded_workflow.gui_json == test_workflow.gui_json
+            
             saved_image.close()

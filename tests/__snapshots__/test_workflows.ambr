@@ -1,14 +1,34 @@
 # serializer version: 1
 # name: TestWorkflows.test_can_load_workflow_from_example_image
   dict({
+    '27': dict({
+      '_meta': dict({
+        'title': 'EmptySD3LatentImage',
+      }),
+      'class_type': 'EmptySD3LatentImage',
+      'inputs': dict({
+        'batch_size': 1,
+        'height': 1024,
+        'width': 1024,
+      }),
+    }),
+    '30': dict({
+      '_meta': dict({
+        'title': 'Load Checkpoint',
+      }),
+      'class_type': 'CheckpointLoaderSimple',
+      'inputs': dict({
+        'ckpt_name': 'flux_project0_v40ArtRealismFP8.safetensors',
+      }),
+    }),
     '31': dict({
       '_meta': dict({
         'title': 'KSampler',
       }),
       'class_type': 'KSampler',
       'inputs': dict({
-        'cfg': 1,
-        'denoise': 1,
+        'cfg': 1.0,
+        'denoise': 1.0,
         'latent_image': list([
           '27',
           0,
@@ -27,8 +47,74 @@
         ]),
         'sampler_name': 'euler',
         'scheduler': 'simple',
-        'seed': 168903481166017,
+        'seed': 1087804419008677,
         'steps': 8,
+      }),
+    }),
+    '33': dict({
+      '_meta': dict({
+        'title': 'CLIP Text Encode (Negative Prompt)',
+      }),
+      'class_type': 'CLIPTextEncode',
+      'inputs': dict({
+        'clip': list([
+          '40',
+          1,
+        ]),
+        'text': '',
+      }),
+    }),
+    '35': dict({
+      '_meta': dict({
+        'title': 'FluxGuidance',
+      }),
+      'class_type': 'FluxGuidance',
+      'inputs': dict({
+        'conditioning': list([
+          '6',
+          0,
+        ]),
+        'guidance': 3.5,
+      }),
+    }),
+    '38': dict({
+      '_meta': dict({
+        'title': 'DualCLIPLoader',
+      }),
+      'class_type': 'DualCLIPLoader',
+      'inputs': dict({
+        'clip_name1': 't5xxl_fp8_e4m3fn_scaled.safetensors',
+        'clip_name2': 'clip_l.safetensors',
+        'device': 'default',
+        'type': 'flux',
+      }),
+    }),
+    '39': dict({
+      '_meta': dict({
+        'title': 'Load VAE',
+      }),
+      'class_type': 'VAELoader',
+      'inputs': dict({
+        'vae_name': 'ae.safetensors',
+      }),
+    }),
+    '40': dict({
+      '_meta': dict({
+        'title': 'Load LoRA',
+      }),
+      'class_type': 'LoraLoader',
+      'inputs': dict({
+        'clip': list([
+          '38',
+          0,
+        ]),
+        'lora_name': 'Hyper-FLUX.1-dev-8steps-lora.safetensors',
+        'model': list([
+          '30',
+          0,
+        ]),
+        'strength_clip': 0.99,
+        'strength_model': 0.1,
       }),
     }),
     '6': dict({
@@ -44,6 +130,35 @@
         'text': 'cute anime girl with massive fluffy fennec ears and a big fluffy tail blonde messy long hair blue eyes wearing a maid outfit with a long black gold leaf pattern dress and a white apron mouth open placing a fancy black forest cake with candles on top of a dinner table of an old dark Victorian mansion lit by candlelight with a bright window to the foggy forest and very expensive stuff everywhere there are paintings on the walls',
       }),
     }),
+    '8': dict({
+      '_meta': dict({
+        'title': 'VAE Decode',
+      }),
+      'class_type': 'VAEDecode',
+      'inputs': dict({
+        'samples': list([
+          '31',
+          0,
+        ]),
+        'vae': list([
+          '39',
+          0,
+        ]),
+      }),
+    }),
+    '9': dict({
+      '_meta': dict({
+        'title': 'Save Image',
+      }),
+      'class_type': 'SaveImage',
+      'inputs': dict({
+        'filename_prefix': 'ComfyUI',
+        'images': list([
+          '8',
+          0,
+        ]),
+      }),
+    }),
   })
 # ---
 # name: TestWorkflows.test_can_load_workflow_from_example_image.1
@@ -57,10 +172,10 @@
       'VHS_latentpreviewrate': 0,
       'ds': dict({
         'offset': list([
-          560.9919785809209,
-          195.68797129473234,
+          394.5455156908438,
+          30.783492889398417,
         ]),
-        'scale': 0.661157024793391,
+        'scale': 0.8800000000000018,
       }),
       'frontendVersion': '1.27.10',
       'links_added_by_ue': list([
@@ -74,6 +189,102 @@
     'last_link_id': 65,
     'last_node_id': 40,
     'links': list([
+      list([
+        9,
+        8,
+        0,
+        9,
+        0,
+        'IMAGE',
+      ]),
+      list([
+        51,
+        27,
+        0,
+        31,
+        3,
+        'LATENT',
+      ]),
+      list([
+        52,
+        31,
+        0,
+        8,
+        0,
+        'LATENT',
+      ]),
+      list([
+        55,
+        33,
+        0,
+        31,
+        2,
+        'CONDITIONING',
+      ]),
+      list([
+        56,
+        6,
+        0,
+        35,
+        0,
+        'CONDITIONING',
+      ]),
+      list([
+        57,
+        35,
+        0,
+        31,
+        1,
+        'CONDITIONING',
+      ]),
+      list([
+        58,
+        39,
+        0,
+        8,
+        1,
+        'VAE',
+      ]),
+      list([
+        61,
+        30,
+        0,
+        40,
+        0,
+        'MODEL',
+      ]),
+      list([
+        62,
+        40,
+        0,
+        31,
+        0,
+        'MODEL',
+      ]),
+      list([
+        63,
+        38,
+        0,
+        40,
+        1,
+        'CLIP',
+      ]),
+      list([
+        64,
+        40,
+        1,
+        6,
+        0,
+        'CLIP',
+      ]),
+      list([
+        65,
+        40,
+        1,
+        33,
+        0,
+        'CLIP',
+      ]),
     ]),
     'nodes': list([
       dict({
@@ -120,6 +331,203 @@
         'type': 'CLIPTextEncode',
         'widgets_values': list([
           'cute anime girl with massive fluffy fennec ears and a big fluffy tail blonde messy long hair blue eyes wearing a maid outfit with a long black gold leaf pattern dress and a white apron mouth open placing a fancy black forest cake with candles on top of a dinner table of an old dark Victorian mansion lit by candlelight with a bright window to the foggy forest and very expensive stuff everywhere there are paintings on the walls',
+        ]),
+      }),
+      dict({
+        'flags': dict({
+        }),
+        'id': 8,
+        'inputs': list([
+          dict({
+            'link': 52,
+            'name': 'samples',
+            'type': 'LATENT',
+          }),
+          dict({
+            'link': 58,
+            'name': 'vae',
+            'type': 'VAE',
+          }),
+        ]),
+        'mode': 0,
+        'order': 10,
+        'outputs': list([
+          dict({
+            'links': list([
+              9,
+            ]),
+            'name': 'IMAGE',
+            'slot_index': 0,
+            'type': 'IMAGE',
+          }),
+        ]),
+        'pos': list([
+          1151,
+          195,
+        ]),
+        'properties': dict({
+          'Node name for S&R': 'VAEDecode',
+          'cnr_id': 'comfy-core',
+          'ver': '0.3.64',
+          'widget_ue_connectable': dict({
+          }),
+        }),
+        'size': list([
+          210,
+          46,
+        ]),
+        'type': 'VAEDecode',
+        'widgets_values': list([
+        ]),
+      }),
+      dict({
+        'flags': dict({
+        }),
+        'id': 9,
+        'inputs': list([
+          dict({
+            'link': 9,
+            'name': 'images',
+            'type': 'IMAGE',
+          }),
+        ]),
+        'mode': 0,
+        'order': 11,
+        'outputs': list([
+        ]),
+        'pos': list([
+          1375,
+          194,
+        ]),
+        'properties': dict({
+          'Node name for S&R': 'SaveImage',
+          'cnr_id': 'comfy-core',
+          'ver': '0.3.64',
+          'widget_ue_connectable': dict({
+          }),
+        }),
+        'size': list([
+          985.2999877929688,
+          1060.3800048828125,
+        ]),
+        'type': 'SaveImage',
+        'widgets_values': list([
+          'ComfyUI',
+        ]),
+      }),
+      dict({
+        'bgcolor': '#535',
+        'color': '#323',
+        'flags': dict({
+        }),
+        'id': 27,
+        'inputs': list([
+        ]),
+        'mode': 0,
+        'order': 0,
+        'outputs': list([
+          dict({
+            'links': list([
+              51,
+            ]),
+            'name': 'LATENT',
+            'slot_index': 0,
+            'type': 'LATENT',
+          }),
+        ]),
+        'pos': list([
+          471,
+          455,
+        ]),
+        'properties': dict({
+          'Node name for S&R': 'EmptySD3LatentImage',
+          'cnr_id': 'comfy-core',
+          'ver': '0.3.64',
+          'widget_ue_connectable': dict({
+          }),
+        }),
+        'size': list([
+          315,
+          106,
+        ]),
+        'type': 'EmptySD3LatentImage',
+        'widgets_values': list([
+          1024,
+          1024,
+          1,
+        ]),
+      }),
+      dict({
+        'flags': dict({
+        }),
+        'id': 35,
+        'inputs': list([
+          dict({
+            'link': 56,
+            'name': 'conditioning',
+            'type': 'CONDITIONING',
+          }),
+        ]),
+        'mode': 0,
+        'order': 8,
+        'outputs': list([
+          dict({
+            'links': list([
+              57,
+            ]),
+            'name': 'CONDITIONING',
+            'slot_index': 0,
+            'type': 'CONDITIONING',
+          }),
+        ]),
+        'pos': list([
+          576,
+          96,
+        ]),
+        'properties': dict({
+          'Node name for S&R': 'FluxGuidance',
+          'cnr_id': 'comfy-core',
+          'ver': '0.3.64',
+          'widget_ue_connectable': dict({
+          }),
+        }),
+        'size': list([
+          211.60000610351562,
+          58,
+        ]),
+        'type': 'FluxGuidance',
+        'widgets_values': list([
+          3.5,
+        ]),
+      }),
+      dict({
+        'bgcolor': '#653',
+        'color': '#432',
+        'flags': dict({
+        }),
+        'id': 34,
+        'inputs': list([
+        ]),
+        'mode': 0,
+        'order': 1,
+        'outputs': list([
+        ]),
+        'pos': list([
+          825,
+          510,
+        ]),
+        'properties': dict({
+          'text': '',
+          'widget_ue_connectable': dict({
+          }),
+        }),
+        'size': list([
+          282.8599853515625,
+          164.0800018310547,
+        ]),
+        'type': 'Note',
+        'widgets_values': list([
+          'Note that Flux dev and schnell do not have any negative prompt so CFG should be set to 1.0. Setting CFG to 1.0 means the negative prompt is ignored.',
         ]),
       }),
       dict({
@@ -177,7 +585,7 @@
         ]),
         'type': 'KSampler',
         'widgets_values': list([
-          168903481166017,
+          1087804419008677,
           'randomize',
           8,
           1,
@@ -186,8 +594,251 @@
           1,
         ]),
       }),
+      dict({
+        'flags': dict({
+        }),
+        'id': 30,
+        'inputs': list([
+        ]),
+        'mode': 0,
+        'order': 2,
+        'outputs': list([
+          dict({
+            'links': list([
+              61,
+            ]),
+            'name': 'MODEL',
+            'slot_index': 0,
+            'type': 'MODEL',
+          }),
+          dict({
+            'links': list([
+            ]),
+            'name': 'CLIP',
+            'slot_index': 1,
+            'type': 'CLIP',
+          }),
+          dict({
+            'links': list([
+            ]),
+            'name': 'VAE',
+            'slot_index': 2,
+            'type': 'VAE',
+          }),
+        ]),
+        'pos': list([
+          -315.0771484375,
+          188.151123046875,
+        ]),
+        'properties': dict({
+          'Node name for S&R': 'CheckpointLoaderSimple',
+          'cnr_id': 'comfy-core',
+          'models': list([
+            dict({
+              'directory': 'checkpoints',
+              'name': 'flux1-dev-fp8.safetensors',
+              'url': 'https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev-fp8.safetensors?download=true',
+            }),
+          ]),
+          'ver': '0.3.64',
+          'widget_ue_connectable': dict({
+          }),
+        }),
+        'size': list([
+          315,
+          98,
+        ]),
+        'type': 'CheckpointLoaderSimple',
+        'widgets_values': list([
+          'flux_project0_v40ArtRealismFP8.safetensors',
+        ]),
+      }),
+      dict({
+        'flags': dict({
+        }),
+        'id': 39,
+        'inputs': list([
+        ]),
+        'mode': 0,
+        'order': 3,
+        'outputs': list([
+          dict({
+            'links': list([
+              58,
+            ]),
+            'name': 'VAE',
+            'type': 'VAE',
+          }),
+        ]),
+        'pos': list([
+          -317.130859375,
+          532.22998046875,
+        ]),
+        'properties': dict({
+          'Node name for S&R': 'VAELoader',
+          'cnr_id': 'comfy-core',
+          'ver': '0.3.64',
+          'widget_ue_connectable': dict({
+          }),
+        }),
+        'size': list([
+          297.981201171875,
+          58,
+        ]),
+        'type': 'VAELoader',
+        'widgets_values': list([
+          'ae.safetensors',
+        ]),
+      }),
+      dict({
+        'bgcolor': '#533',
+        'color': '#322',
+        'flags': dict({
+          'collapsed': True,
+        }),
+        'id': 33,
+        'inputs': list([
+          dict({
+            'link': 65,
+            'name': 'clip',
+            'type': 'CLIP',
+          }),
+        ]),
+        'mode': 0,
+        'order': 7,
+        'outputs': list([
+          dict({
+            'links': list([
+              55,
+            ]),
+            'name': 'CONDITIONING',
+            'slot_index': 0,
+            'type': 'CONDITIONING',
+          }),
+        ]),
+        'pos': list([
+          390.7008056640625,
+          400.7007141113281,
+        ]),
+        'properties': dict({
+          'Node name for S&R': 'CLIPTextEncode',
+          'cnr_id': 'comfy-core',
+          'ver': '0.3.64',
+          'widget_ue_connectable': dict({
+          }),
+        }),
+        'size': list([
+          422.1492004394531,
+          163.60926818847656,
+        ]),
+        'title': 'CLIP Text Encode (Negative Prompt)',
+        'type': 'CLIPTextEncode',
+        'widgets_values': list([
+          '',
+        ]),
+      }),
+      dict({
+        'flags': dict({
+        }),
+        'id': 38,
+        'inputs': list([
+        ]),
+        'mode': 0,
+        'order': 4,
+        'outputs': list([
+          dict({
+            'links': list([
+              63,
+            ]),
+            'name': 'CLIP',
+            'type': 'CLIP',
+          }),
+        ]),
+        'pos': list([
+          -320.8647766113281,
+          349.81097412109375,
+        ]),
+        'properties': dict({
+          'Node name for S&R': 'DualCLIPLoader',
+          'cnr_id': 'comfy-core',
+          'ver': '0.3.64',
+          'widget_ue_connectable': dict({
+          }),
+        }),
+        'size': list([
+          299.6770935058594,
+          130,
+        ]),
+        'type': 'DualCLIPLoader',
+        'widgets_values': list([
+          't5xxl_fp8_e4m3fn_scaled.safetensors',
+          'clip_l.safetensors',
+          'flux',
+          'default',
+        ]),
+      }),
+      dict({
+        'flags': dict({
+        }),
+        'id': 40,
+        'inputs': list([
+          dict({
+            'link': 61,
+            'name': 'model',
+            'type': 'MODEL',
+          }),
+          dict({
+            'link': 63,
+            'name': 'clip',
+            'type': 'CLIP',
+          }),
+        ]),
+        'mode': 0,
+        'order': 5,
+        'outputs': list([
+          dict({
+            'links': list([
+              62,
+            ]),
+            'name': 'MODEL',
+            'type': 'MODEL',
+          }),
+          dict({
+            'links': list([
+              64,
+              65,
+            ]),
+            'name': 'CLIP',
+            'type': 'CLIP',
+          }),
+        ]),
+        'pos': list([
+          65.4094467163086,
+          197.2556915283203,
+        ]),
+        'properties': dict({
+          'Node name for S&R': 'LoraLoader',
+          'cnr_id': 'comfy-core',
+          'ver': '0.3.64',
+          'widget_ue_connectable': dict({
+          }),
+        }),
+        'size': list([
+          270,
+          126,
+        ]),
+        'type': 'LoraLoader',
+        'widgets_values': list([
+          'Hyper-FLUX.1-dev-8steps-lora.safetensors',
+          0.1,
+          0.99,
+        ]),
+      }),
     ]),
     'revision': 0,
+    'seed_widgets': dict({
+      '31': 0,
+    }),
     'version': 0.4,
   })
 # ---

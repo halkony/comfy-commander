@@ -21,11 +21,35 @@ class ComfyImage:
     filename: str = attrs.field(default="")
     subfolder: str = attrs.field(default="")
     type: str = attrs.field(default="output")
+    _workflow: Optional["Workflow"] = attrs.field(default=None, init=False)
     
-    def save(self, filepath: str) -> None:
-        """Save the image to a file."""
+    def save(self, filepath: str, workflow: Optional["Workflow"] = None) -> None:
+        """Save the image to a file with optional workflow metadata.
+        
+        Args:
+            filepath: Path where to save the image
+            workflow: Optional workflow to embed in image metadata. If not provided,
+                     will use any workflow stored in the image object.
+        """
         image = Image.open(io.BytesIO(self.data))
-        image.save(filepath)
+        
+        # Use provided workflow or stored workflow reference
+        workflow_to_use = workflow or getattr(self, '_workflow', None)
+        
+        if workflow_to_use is not None:
+            # Embed metadata directly as PNG text chunks
+            from PIL.PngImagePlugin import PngInfo
+            pnginfo = PngInfo()
+            
+            # Store prompt and workflow as separate text chunks
+            pnginfo.add_text('prompt', json.dumps(workflow_to_use.api_json, ensure_ascii=False))
+            pnginfo.add_text('workflow', json.dumps(workflow_to_use.gui_json, ensure_ascii=False))
+            
+            # Save the image with embedded metadata
+            image.save(filepath, format='PNG', pnginfo=pnginfo)
+        else:
+            # Save the image without metadata
+            image.save(filepath, format='PNG')
     
     def __repr__(self) -> str:
         """Compact string representation."""
@@ -153,15 +177,16 @@ class Workflow:
         pass
     
     @classmethod
-    def from_file(cls, file_path: str, server: Optional["ComfyUIServer"] = None) -> "Workflow":
+    def from_file(cls, file_path: str) -> "Workflow":
         """Load a workflow from a JSON file, automatically detecting format.
         
         Args:
             file_path: Path to the workflow JSON file
-            server: Optional ComfyUI server instance for conversion if needed
             
         Returns:
-            Workflow instance with both API and GUI data
+            Workflow instance with both API and GUI data. If loading a standard
+            workflow format, the API data will be minimal and conversion will
+            happen automatically at execution time.
         """
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -170,12 +195,8 @@ class Workflow:
         if 'nodes' in data and 'links' in data:
             # Standard workflow format
             gui_data = data
-            if server:
-                # Convert to API format using server
-                api_data = server.convert_workflow(gui_data)
-            else:
-                # Create minimal API structure (will need server for actual conversion)
-                api_data = cls._create_minimal_api_from_gui(gui_data)
+            # Create minimal API structure (will need server for actual conversion)
+            api_data = cls._create_minimal_api_from_gui(gui_data)
         else:
             # API workflow format
             api_data = data
@@ -198,13 +219,18 @@ class Workflow:
     
     @classmethod
     def from_image(cls, file_path: str) -> "Workflow":
-        """Load a workflow from an image metadata file."""
-        with open(file_path, 'r') as f:
-            image_data = json.load(f)
-        
-        # Extract prompt and workflow from image metadata
-        api_data = image_data.get("prompt", {})
-        gui_data = image_data.get("workflow", {})
+        """Load a workflow from an image with embedded metadata."""
+        # Open the image and read metadata from image.info
+        with Image.open(file_path) as image:
+            prompt_json = image.info.get('prompt')
+            workflow_json = image.info.get('workflow')
+            
+            if prompt_json is None or workflow_json is None:
+                raise ValueError(f"No ComfyUI workflow metadata found in image: {file_path}")
+            
+            # Parse the JSON metadata
+            api_data = json.loads(prompt_json)
+            gui_data = json.loads(workflow_json)
         
         return cls(api_json=api_data, gui_json=gui_data)
     
@@ -401,10 +427,17 @@ class Workflow:
             ConnectionError: If server is not available
             requests.RequestException: If conversion fails
         """
-        # Check if we have a minimal API structure (from standard workflow without server)
-        if not self.api_json or not any(
-            node_data.get("inputs") for node_data in self.api_json.values()
-        ):
+        # Check if this is a minimal API structure (created from GUI format)
+        # by looking for nodes with empty inputs but non-empty gui_json
+        needs_conversion = (
+            self.gui_json and  # Has GUI data
+            len(self.api_json) > 0 and  # Has API data with nodes
+            not any(
+                node_data.get("inputs") for node_data in self.api_json.values()
+            )  # But API data has no inputs (minimal structure)
+        )
+        
+        if needs_conversion:
             # Need to convert from GUI format
             if not server.is_available():
                 raise ConnectionError("ComfyUI server is not available for workflow conversion")
@@ -466,6 +499,28 @@ class ComfyUIServer:
         response.raise_for_status()
         return response.json()
     
+    def _filter_executable_nodes(self, api_workflow: Dict[str, Any]) -> Dict[str, Any]:
+        """Filter out non-executable nodes from the workflow.
+        
+        Args:
+            api_workflow: Original API workflow data
+            
+        Returns:
+            Filtered workflow with only executable nodes
+        """
+        # List of node types that are not executable (UI-only nodes)
+        non_executable_types = {
+            "Note", "Reroute", "PrimitiveNode", "Widget", "Group", "Frame"
+        }
+        
+        filtered_workflow = {}
+        for node_id, node_data in api_workflow.items():
+            class_type = node_data.get("class_type", "")
+            if class_type not in non_executable_types:
+                filtered_workflow[node_id] = node_data
+        
+        return filtered_workflow
+    
     def _send_workflow_to_server(self, api_workflow: Dict[str, Any], client_id: str = "comfy-commander") -> str:
         """Execute an API format workflow on the server.
         
@@ -479,6 +534,8 @@ class ComfyUIServer:
         Raises:
             requests.RequestException: If the execution request fails
         """
+        # Filter out non-executable nodes (like Note, Reroute, etc.)
+        
         response = requests.post(
             f"{self.base_url}/prompt",
             json={"prompt": api_workflow, "client_id": client_id},
@@ -520,11 +577,12 @@ class ComfyUIServer:
         response.raise_for_status()
         return response.json()
     
-    def get_output_images(self, prompt_id: str) -> List[ComfyImage]:
+    def get_output_images(self, prompt_id: str, workflow: Optional["Workflow"] = None) -> List[ComfyImage]:
         """Get output images from a completed execution.
         
         Args:
             prompt_id: The prompt ID to get images for
+            workflow: Optional workflow to embed in image metadata
             
         Returns:
             List of ComfyImage objects
@@ -561,6 +619,11 @@ class ComfyUIServer:
                         subfolder=image_info.get("subfolder", ""),
                         type=image_info.get("type", "output")
                     )
+                    
+                    # Store workflow reference for later use when saving
+                    if workflow is not None:
+                        image._workflow = workflow
+                    
                     images.append(image)
         
         return images
@@ -656,19 +719,19 @@ class ComfyUIServer:
         try:
             loop = asyncio.get_running_loop()
             # We're in an async context, so we need to run the async version
-            return asyncio.create_task(self._execute_async_internal(prompt_id, poll_interval, timeout))
+            return asyncio.create_task(self._execute_async_internal(prompt_id, poll_interval, timeout, workflow))
         except RuntimeError:
             # No event loop running, we're in sync context - run async code in sync
-            return asyncio.run(self._execute_async_internal(prompt_id, poll_interval, timeout))
+            return asyncio.run(self._execute_async_internal(prompt_id, poll_interval, timeout, workflow))
     
-    async def _execute_async_internal(self, prompt_id: str, poll_interval: float, timeout: float) -> ExecutionResult:
+    async def _execute_async_internal(self, prompt_id: str, poll_interval: float, timeout: float, workflow: "Workflow") -> ExecutionResult:
         """Internal async execution method."""
         try:
             # Wait for completion
             execution_data = await self.wait_for_completion(prompt_id, poll_interval, timeout)
             
-            # Get the output images
-            images = self.get_output_images(prompt_id)
+            # Get the output images with workflow metadata
+            images = self.get_output_images(prompt_id, workflow)
             
             return ExecutionResult(
                 prompt_id=prompt_id,

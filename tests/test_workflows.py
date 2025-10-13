@@ -2,6 +2,7 @@ import pytest
 import asyncio
 import tempfile
 import os
+import json
 from unittest.mock import Mock, patch, MagicMock
 from comfy_commander import Workflow, ComfyUIServer, ComfyImage, ExecutionResult
 from helpers import (
@@ -298,6 +299,151 @@ class TestWorkflows:
             assert saved_image.size == (100, 100)
             assert saved_image.mode == 'RGB'
             saved_image.close()  # Close the image to release file handle
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except PermissionError:
+                    # On Windows, sometimes the file is still locked
+                    pass
+
+    def test_comfy_image_save_with_workflow_metadata(self):
+        """Test ComfyImage save functionality with workflow metadata embedding."""
+        # Create a simple test image
+        from PIL import Image
+        import io
+        
+        # Create a 100x100 red image
+        test_image = Image.new('RGB', (100, 100), color='red')
+        img_bytes = io.BytesIO()
+        test_image.save(img_bytes, format='PNG')
+        img_data = img_bytes.getvalue()
+        
+        # Create a test workflow
+        test_workflow = Workflow(
+            api_json={"1": {"class_type": "TestNode", "inputs": {"test": "value"}}},
+            gui_json={"nodes": [{"id": 1, "type": "TestNode"}]}
+        )
+        
+        # Create ComfyImage with workflow reference
+        comfy_image = ComfyImage(
+            data=img_data,
+            filename="test_with_workflow.png",
+            subfolder="output",
+            type="output"
+        )
+        comfy_image._workflow = test_workflow
+        
+        # Test saving to file with workflow metadata
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+            tmp_path = tmp_file.name
+        
+        try:
+            comfy_image.save(tmp_path)
+            
+            # Verify the file was created
+            assert os.path.exists(tmp_path)
+            
+            # Verify the image can be opened and has the correct properties
+            saved_image = Image.open(tmp_path)
+            assert saved_image.size == (100, 100)
+            assert saved_image.mode == 'RGB'
+            
+            # Verify workflow metadata is embedded in image.info
+            assert 'prompt' in saved_image.info
+            assert 'workflow' in saved_image.info
+            
+            # Parse the metadata
+            prompt_data = json.loads(saved_image.info['prompt'])
+            workflow_data = json.loads(saved_image.info['workflow'])
+            
+            # Verify the metadata structure
+            assert prompt_data == test_workflow.api_json
+            assert workflow_data == test_workflow.gui_json
+            
+            saved_image.close()
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except PermissionError:
+                    # On Windows, sometimes the file is still locked
+                    pass
+
+    def test_workflow_from_image_with_metadata(self):
+        """Test loading a workflow from an image with embedded metadata."""
+        # Create a simple test image
+        from PIL import Image
+        import io
+        
+        # Create a 100x100 red image
+        test_image = Image.new('RGB', (100, 100), color='red')
+        img_bytes = io.BytesIO()
+        test_image.save(img_bytes, format='PNG')
+        img_data = img_bytes.getvalue()
+        
+        # Create a test workflow
+        test_workflow = Workflow(
+            api_json={"1": {"class_type": "TestNode", "inputs": {"test": "value"}}},
+            gui_json={"nodes": [{"id": 1, "type": "TestNode"}]}
+        )
+        
+        # Create ComfyImage with workflow reference
+        comfy_image = ComfyImage(
+            data=img_data,
+            filename="test_workflow_roundtrip.png",
+            subfolder="output",
+            type="output"
+        )
+        comfy_image._workflow = test_workflow
+        
+        # Save the image with metadata
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+            tmp_path = tmp_file.name
+        
+        try:
+            comfy_image.save(tmp_path)
+            
+            # Load the workflow back from the image
+            loaded_workflow = Workflow.from_image(tmp_path)
+            
+            # Verify the workflow was loaded correctly
+            assert loaded_workflow.api_json == test_workflow.api_json
+            assert loaded_workflow.gui_json == test_workflow.gui_json
+            
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except PermissionError:
+                    # On Windows, sometimes the file is still locked
+                    pass
+
+    def test_workflow_from_image_no_metadata(self):
+        """Test loading a workflow from an image without metadata raises error."""
+        # Create a simple test image without metadata
+        from PIL import Image
+        import io
+        
+        # Create a 100x100 red image
+        test_image = Image.new('RGB', (100, 100), color='red')
+        img_bytes = io.BytesIO()
+        test_image.save(img_bytes, format='PNG')
+        img_data = img_bytes.getvalue()
+        
+        # Save the image without metadata
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+            tmp_path = tmp_file.name
+        
+        try:
+            # Write the image data directly
+            with open(tmp_path, 'wb') as f:
+                f.write(img_data)
+            
+            # Try to load workflow from image without metadata
+            with pytest.raises(ValueError, match="No ComfyUI workflow metadata found"):
+                Workflow.from_image(tmp_path)
+            
         finally:
             if os.path.exists(tmp_path):
                 try:
