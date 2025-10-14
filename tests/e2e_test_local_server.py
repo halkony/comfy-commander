@@ -10,7 +10,7 @@ import tempfile
 import os
 from unittest.mock import Mock, patch, MagicMock
 
-from comfy_commander.core import ComfyUIServer, Workflow, ExecutionResult, ComfyImage
+from comfy_commander.core import ComfyUIServer, Workflow, ExecutionResult, ComfyOutput, MediaCollection
 
 # E2E Tests - These require a running ComfyUI instance with the workflow converter extension
 class TestComfyUIServerE2E:
@@ -175,7 +175,7 @@ class TestComfyUIServerE2E:
             pass
         
         # Execute the workflow asynchronously
-        result = await server.execute(workflow, timeout=60.0)  # 60 second timeout
+        result = await server.execute_async(workflow, timeout=60.0)  # 60 second timeout
         
         # Verify the result
         assert isinstance(result, ExecutionResult)
@@ -187,18 +187,18 @@ class TestComfyUIServerE2E:
         
         if result.status == "success":
             # If successful, we should have some media
-            assert isinstance(result.media, list)
+            assert isinstance(result.media, MediaCollection)
             
             # This workflow should produce images (it has a SaveImage node)
             # So we expect at least one image in the result
             assert len(result.media) > 0, "Workflow should produce at least one image but result.media is empty"
             
-            # Verify that the images are valid ComfyImage objects
-            for i, image in enumerate(result.media):
-                assert hasattr(image, 'data'), f"Image {i} should have data attribute"
-                assert hasattr(image, 'filename'), f"Image {i} should have filename attribute"
-                assert len(image.data) > 0, f"Image {i} should have non-empty data"
-                assert image.filename, f"Image {i} should have a filename"
+            # Verify that the images are valid ComfyOutput objects
+            for i, output in enumerate(result.media):
+                assert hasattr(output, 'data'), f"Output {i} should have data attribute"
+                assert hasattr(output, 'filename'), f"Output {i} should have filename attribute"
+                assert len(output.data) > 0, f"Output {i} should have non-empty data"
+                assert output.filename, f"Output {i} should have a filename"
         else:
             # If there was an error, we should have an error message
             assert result.error_message is not None
@@ -268,18 +268,18 @@ class TestComfyUIServerE2E:
         
         if result.status == "success":
             # If successful, we should have some media
-            assert isinstance(result.media, list)
+            assert isinstance(result.media, MediaCollection)
             
             # This workflow should produce images (it has a SaveImage node)
             # So we expect at least one image in the result
             assert len(result.media) > 0, "Workflow should produce at least one image but result.media is empty"
             
-            # Verify that the images are valid ComfyImage objects
-            for i, image in enumerate(result.media):
-                assert hasattr(image, 'data'), f"Image {i} should have data attribute"
-                assert hasattr(image, 'filename'), f"Image {i} should have filename attribute"
-                assert len(image.data) > 0, f"Image {i} should have non-empty data"
-                assert image.filename, f"Image {i} should have a filename"
+            # Verify that the images are valid ComfyOutput objects
+            for i, output in enumerate(result.media):
+                assert hasattr(output, 'data'), f"Output {i} should have data attribute"
+                assert hasattr(output, 'filename'), f"Output {i} should have filename attribute"
+                assert len(output.data) > 0, f"Output {i} should have non-empty data"
+                assert output.filename, f"Output {i} should have a filename"
         else:
             # If there was an error, we should have an error message
             assert result.error_message is not None
@@ -302,16 +302,16 @@ class TestComfyUIServerE2E:
         workflow = Workflow.from_file(workflow_path)
         
         # Execute the workflow asynchronously
-        result = await server.execute(workflow, timeout=60.0)
+        result = await server.execute_async(workflow, timeout=60.0)
         assert len(result.media) > 0, "No images produced"
         
         # If we have images, test saving them
         if result.status == "success" and result.media:
             with tempfile.TemporaryDirectory() as temp_dir:
-                for i, image in enumerate(result.media):
-                    # Test saving the image
+                for i, output in enumerate(result.media):
+                    # Test saving the output
                     output_path = os.path.join(temp_dir, f"test_output_{i}.png")
-                    image.save(output_path)
+                    output.save(output_path)
                     
                     # Verify the file was created
                     assert os.path.exists(output_path)
@@ -328,7 +328,7 @@ class TestComfyUIServerE2E:
                         pytest.fail(f"Saved image is not valid: {e}")
 
     def test_comfy_image_creation_e2e(self):
-        """Test ComfyImage creation and manipulation without server."""
+        """Test ComfyOutput creation and manipulation without server."""
         # Create a simple test image
         from PIL import Image
         import io
@@ -339,8 +339,8 @@ class TestComfyUIServerE2E:
         test_image.save(img_bytes, format='PNG')
         img_data = img_bytes.getvalue()
         
-        # Create ComfyImage
-        comfy_image = ComfyImage(
+        # Create ComfyOutput
+        comfy_output = ComfyOutput(
             data=img_data,
             filename="test_e2e.png",
             subfolder="output",
@@ -350,7 +350,7 @@ class TestComfyUIServerE2E:
         # Test saving to file
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = os.path.join(temp_dir, "test_e2e_output.png")
-            comfy_image.save(output_path)
+            comfy_output.save(output_path)
             
             # Verify the file was created and is valid
             assert os.path.exists(output_path)
@@ -363,7 +363,7 @@ class TestComfyUIServerE2E:
             saved_image.close()
 
     def test_comfy_image_metadata_embedding_e2e(self):
-        """Test ComfyImage metadata embedding functionality end-to-end."""
+        """Test ComfyOutput metadata embedding functionality end-to-end."""
         # Create a simple test image
         from PIL import Image
         import io
@@ -380,19 +380,19 @@ class TestComfyUIServerE2E:
             gui_json={"nodes": [{"id": 1, "type": "TestNode"}]}
         )
         
-        # Create ComfyImage with workflow reference
-        comfy_image = ComfyImage(
+        # Create ComfyOutput with workflow reference
+        comfy_output = ComfyOutput(
             data=img_data,
             filename="test_e2e_metadata.png",
             subfolder="output",
             type="output"
         )
-        comfy_image._workflow = test_workflow
+        comfy_output._workflow = test_workflow
         
         # Test saving to file with metadata
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = os.path.join(temp_dir, "test_e2e_metadata_output.png")
-            comfy_image.save(output_path)
+            comfy_output.save(output_path)
             
             # Verify the file was created
             assert os.path.exists(output_path)

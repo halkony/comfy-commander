@@ -4,7 +4,7 @@ import tempfile
 import os
 import json
 from unittest.mock import Mock, patch, MagicMock
-from comfy_commander import Workflow, ComfyUIServer, ComfyImage, ExecutionResult
+from comfy_commander import Workflow, ComfyUIServer, ComfyOutput, ExecutionResult
 from helpers import (
     assert_api_param_updated,
     assert_gui_widget_updated,
@@ -287,8 +287,8 @@ class TestWorkflows:
         assert_api_param_updated(workflow, "31", "seed", 777777777)
         assert_gui_widget_updated(workflow, 31, 0, 777777777)
 
-    def test_comfy_image_creation_and_save(self):
-        """Test ComfyImage creation and save functionality."""
+    def test_comfy_output_creation_and_save(self):
+        """Test ComfyOutput creation and save functionality."""
         # Create a simple test image
         from PIL import Image
         import io
@@ -299,20 +299,24 @@ class TestWorkflows:
         test_image.save(img_bytes, format='PNG')
         img_data = img_bytes.getvalue()
         
-        # Create ComfyImage
-        comfy_image = ComfyImage(
+        # Create ComfyOutput
+        comfy_output = ComfyOutput(
             data=img_data,
             filename="test.png",
             subfolder="output",
             type="output"
         )
         
+        # Test that it's detected as an image
+        assert comfy_output.is_image
+        assert comfy_output.file_extension == "png"
+        
         # Test saving to file
         with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
             tmp_path = tmp_file.name
         
         try:
-            comfy_image.save(tmp_path)
+            comfy_output.save(tmp_path)
             
             # Verify the file was created and contains the image
             assert os.path.exists(tmp_path)
@@ -328,8 +332,8 @@ class TestWorkflows:
                     # On Windows, sometimes the file is still locked
                     pass
 
-    def test_comfy_image_save_with_workflow_metadata(self):
-        """Test ComfyImage save functionality with workflow metadata embedding."""
+    def test_comfy_output_save_with_workflow_metadata(self):
+        """Test ComfyOutput save functionality with workflow metadata embedding."""
         # Create a simple test image
         from PIL import Image
         import io
@@ -346,21 +350,21 @@ class TestWorkflows:
             gui_json={"nodes": [{"id": 1, "type": "TestNode"}]}
         )
         
-        # Create ComfyImage with workflow reference
-        comfy_image = ComfyImage(
+        # Create ComfyOutput with workflow reference
+        comfy_output = ComfyOutput(
             data=img_data,
             filename="test_with_workflow.png",
             subfolder="output",
             type="output"
         )
-        comfy_image._workflow = test_workflow
+        comfy_output._workflow = test_workflow
         
         # Test saving to file with workflow metadata
         with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
             tmp_path = tmp_file.name
         
         try:
-            comfy_image.save(tmp_path)
+            comfy_output.save(tmp_path)
             
             # Verify the file was created
             assert os.path.exists(tmp_path)
@@ -409,21 +413,21 @@ class TestWorkflows:
             gui_json={"nodes": [{"id": 1, "type": "TestNode"}]}
         )
         
-        # Create ComfyImage with workflow reference
-        comfy_image = ComfyImage(
+        # Create ComfyOutput with workflow reference
+        comfy_output = ComfyOutput(
             data=img_data,
             filename="test_workflow_roundtrip.png",
             subfolder="output",
             type="output"
         )
-        comfy_image._workflow = test_workflow
+        comfy_output._workflow = test_workflow
         
         # Save the image with metadata
         with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
             tmp_path = tmp_file.name
         
         try:
-            comfy_image.save(tmp_path)
+            comfy_output.save(tmp_path)
             
             # Load the workflow back from the image
             loaded_workflow = Workflow.from_image(tmp_path)
@@ -473,8 +477,8 @@ class TestWorkflows:
                     # On Windows, sometimes the file is still locked
                     pass
 
-    def test_comfy_image_from_base64(self):
-        """Test ComfyImage creation from base64 data."""
+    def test_comfy_output_from_base64(self):
+        """Test ComfyOutput creation from base64 data."""
         import base64
         
         # Create test image data
@@ -489,8 +493,8 @@ class TestWorkflows:
         # Encode to base64
         base64_data = base64.b64encode(img_data).decode('utf-8')
         
-        # Create ComfyImage from base64
-        comfy_image = ComfyImage.from_base64(
+        # Create ComfyOutput from base64
+        comfy_output = ComfyOutput.from_base64(
             base64_data,
             filename="base64_test.png",
             subfolder="test",
@@ -498,21 +502,22 @@ class TestWorkflows:
         )
         
         # Verify properties
-        assert comfy_image.filename == "base64_test.png"
-        assert comfy_image.subfolder == "test"
-        assert comfy_image.type == "input"
-        assert len(comfy_image.data) > 0
+        assert comfy_output.filename == "base64_test.png"
+        assert comfy_output.subfolder == "test"
+        assert comfy_output.type == "input"
+        assert len(comfy_output.data) > 0
+        assert comfy_output.is_image
 
     def test_execution_result_creation(self):
         """Test ExecutionResult creation and properties."""
-        # Create test images
-        image1 = ComfyImage(data=b"fake_image_data_1", filename="test1.png")
-        image2 = ComfyImage(data=b"fake_image_data_2", filename="test2.png")
+        # Create test outputs
+        output1 = ComfyOutput(data=b"fake_output_data_1", filename="test1.png")
+        output2 = ComfyOutput(data=b"fake_output_data_2", filename="test2.mp4")
         
         # Create ExecutionResult
         result = ExecutionResult(
             prompt_id="test_prompt_123",
-            media=[image1, image2],
+            media=[output1, output2],
             status="success"
         )
         
@@ -520,7 +525,9 @@ class TestWorkflows:
         assert result.prompt_id == "test_prompt_123"
         assert len(result.media) == 2
         assert result.media[0].filename == "test1.png"
-        assert result.media[1].filename == "test2.png"
+        assert result.media[1].filename == "test2.mp4"
+        assert result.media[0].is_image
+        assert result.media[1].is_video
         assert result.status == "success"
         assert result.error_message is None
 
@@ -580,7 +587,7 @@ class TestWorkflows:
             # Mock the methods at class level
             with patch.object(ComfyUIServer, '_send_workflow_to_server', return_value="test_prompt_123"), \
                  patch.object(ComfyUIServer, 'wait_for_completion', side_effect=mock_wait_for_completion), \
-                 patch.object(ComfyUIServer, 'get_output_images', return_value=[ComfyImage(data=b"fake_image", filename="test_output.png")]):
+                 patch.object(ComfyUIServer, 'get_outputs', return_value=[ComfyOutput(data=b"fake_image", filename="test_output.png")]):
                 
                 # Create workflow
                 api_json = {"1": {"class_type": "KSampler", "inputs": {"seed": 123}}}
@@ -637,7 +644,7 @@ class TestWorkflows:
         # Mock the methods at class level
         with patch.object(ComfyUIServer, '_send_workflow_to_server', return_value="test_prompt_123"), \
              patch.object(ComfyUIServer, 'wait_for_completion', side_effect=mock_wait_for_completion), \
-             patch.object(ComfyUIServer, 'get_output_images', return_value=[ComfyImage(data=b"fake_image", filename="test_output.png")]):
+             patch.object(ComfyUIServer, 'get_outputs', return_value=[ComfyOutput(data=b"fake_image", filename="test_output.png")]):
             
             # Execute in async mode
             result = await server.execute_async(workflow)
@@ -677,50 +684,50 @@ class TestWorkflows:
             assert len(result.media) == 0
 
 
-class TestComfyImageNodeAttribute:
-    """Test ComfyImage node attribute functionality."""
+class TestComfyOutputNodeAttribute:
+    """Test ComfyOutput node attribute functionality."""
     
-    def test_comfyimage_creation_with_node(self, example_api_workflow_file_path):
-        """Test creating ComfyImage with node reference."""
+    def test_comfyoutput_creation_with_node(self, example_api_workflow_file_path):
+        """Test creating ComfyOutput with node reference."""
         workflow = Workflow.from_file(example_api_workflow_file_path)
         node = workflow.node(id="31")  # KSampler node
         
-        image_data = b"fake_image_data"
-        image = ComfyImage(
-            data=image_data,
+        output_data = b"fake_output_data"
+        output = ComfyOutput(
+            data=output_data,
             filename="test.png",
             subfolder="output",
             type="output",
             node=node
         )
         
-        assert image.node is not None
-        assert image.node.id == "31"
-        assert image.node.class_type == "KSampler"
-        assert image.node.workflow == workflow
+        assert output.node is not None
+        assert output.node.id == "31"
+        assert output.node.class_type == "KSampler"
+        assert output.node.workflow == workflow
     
-    def test_comfyimage_creation_without_node(self):
-        """Test creating ComfyImage without node reference."""
-        image_data = b"fake_image_data"
-        image = ComfyImage(
-            data=image_data,
+    def test_comfyoutput_creation_without_node(self):
+        """Test creating ComfyOutput without node reference."""
+        output_data = b"fake_output_data"
+        output = ComfyOutput(
+            data=output_data,
             filename="test.png",
             subfolder="output",
             type="output"
         )
         
-        assert image.node is None
+        assert output.node is None
     
-    def test_comfyimage_from_base64_with_node(self, example_api_workflow_file_path):
-        """Test creating ComfyImage from base64 with node reference."""
+    def test_comfyoutput_from_base64_with_node(self, example_api_workflow_file_path):
+        """Test creating ComfyOutput from base64 with node reference."""
         workflow = Workflow.from_file(example_api_workflow_file_path)
         node = workflow.node(id="31")  # KSampler node
         
         import base64
-        image_data = b"fake_image_data"
-        base64_data = base64.b64encode(image_data).decode('utf-8')
+        output_data = b"fake_output_data"
+        base64_data = base64.b64encode(output_data).decode('utf-8')
         
-        image = ComfyImage.from_base64(
+        output = ComfyOutput.from_base64(
             base64_data=base64_data,
             filename="test.png",
             subfolder="output",
@@ -728,24 +735,24 @@ class TestComfyImageNodeAttribute:
             node=node
         )
         
-        assert image.node is not None
-        assert image.node.id == "31"
-        assert image.node.class_type == "KSampler"
+        assert output.node is not None
+        assert output.node.id == "31"
+        assert output.node.class_type == "KSampler"
     
     def test_comfyimage_from_base64_without_node(self):
-        """Test creating ComfyImage from base64 without node reference."""
+        """Test creating ComfyOutput from base64 without node reference."""
         import base64
-        image_data = b"fake_image_data"
-        base64_data = base64.b64encode(image_data).decode('utf-8')
+        output_data = b"fake_output_data"
+        base64_data = base64.b64encode(output_data).decode('utf-8')
         
-        image = ComfyImage.from_base64(
+        output = ComfyOutput.from_base64(
             base64_data=base64_data,
             filename="test.png",
             subfolder="output",
             type="output"
         )
         
-        assert image.node is None
+        assert output.node is None
     
     @patch('requests.get')
     def test_get_output_images_sets_node_reference(self, mock_get, example_api_workflow_file_path):
@@ -781,13 +788,13 @@ class TestComfyImageNodeAttribute:
             images = server.get_output_images("test_prompt_123", workflow)
         
         assert len(images) == 1
-        image = images[0]
+        output = images[0]
         
         # Check that node reference is set correctly
-        assert image.node is not None
-        assert image.node.id == "31"
-        assert image.node.class_type == "KSampler"
-        assert image.node.workflow == workflow
+        assert output.node is not None
+        assert output.node.id == "31"
+        assert output.node.class_type == "KSampler"
+        assert output.node.workflow == workflow
     
     @patch('requests.get')
     def test_get_output_images_without_workflow(self, mock_get):
@@ -822,10 +829,10 @@ class TestComfyImageNodeAttribute:
             images = server.get_output_images("test_prompt_123", None)
         
         assert len(images) == 1
-        image = images[0]
+        output = images[0]
         
         # Check that node reference is None when no workflow provided
-        assert image.node is None
+        assert output.node is None
     
     @patch('requests.get')
     def test_get_output_images_node_not_in_workflow(self, mock_get, example_api_workflow_file_path):
@@ -861,40 +868,40 @@ class TestComfyImageNodeAttribute:
             images = server.get_output_images("test_prompt_123", workflow)
         
         assert len(images) == 1
-        image = images[0]
+        output = images[0]
         
         # Check that a basic Node object is created for non-existent node
-        assert image.node is not None
-        assert image.node.id == "999"
-        assert image.node.workflow == workflow
+        assert output.node is not None
+        assert output.node.id == "999"
+        assert output.node.workflow == workflow
         # The class_type should be empty since it's not in the workflow
-        assert image.node.class_type == ""
+        assert output.node.class_type == ""
     
     def test_comfyimage_node_access_properties(self, example_api_workflow_file_path):
-        """Test accessing node properties through ComfyImage."""
+        """Test accessing node properties through ComfyOutput."""
         workflow = Workflow.from_file(example_api_workflow_file_path)
         node = workflow.node(id="31")  # KSampler node
         
-        image_data = b"fake_image_data"
-        image = ComfyImage(
-            data=image_data,
+        output_data = b"fake_output_data"
+        output = ComfyOutput(
+            data=output_data,
             filename="test.png",
             subfolder="output",
             type="output",
             node=node
         )
         
-        # Test accessing node properties through the image
-        assert image.node.class_type == "KSampler"
-        assert image.node.id == "31"
+        # Test accessing node properties through the output
+        assert output.node.class_type == "KSampler"
+        assert output.node.id == "31"
         
         # Test accessing node parameters
-        seed_value = image.node.param("seed").value
+        seed_value = output.node.param("seed").value
         assert seed_value is not None
         
-        # Test modifying node parameters through the image
-        image.node.param("seed").set(999999)
-        assert image.node.param("seed").value == 999999
+        # Test modifying node parameters through the output
+        output.node.param("seed").set(999999)
+        assert output.node.param("seed").value == 999999
         
         # Verify the change is reflected in the workflow
         assert workflow.node(id="31").param("seed").value == 999999
@@ -911,12 +918,12 @@ class TestMediaCollection:
         node1 = workflow.node(id="31")  # KSampler node
         node2 = workflow.node(id="6")   # CLIPTextEncode node
         
-        image1 = ComfyImage(
+        image1 = ComfyOutput(
             data=b"fake_image_data_1",
             filename="test1.png",
             node=node1
         )
-        image2 = ComfyImage(
+        image2 = ComfyOutput(
             data=b"fake_image_data_2", 
             filename="test2.png",
             node=node2
@@ -949,12 +956,12 @@ class TestMediaCollection:
         node1 = workflow.node(id="31")  # KSampler node with title "KSampler"
         node2 = workflow.node(id="6")   # CLIPTextEncode node
         
-        image1 = ComfyImage(
+        image1 = ComfyOutput(
             data=b"fake_image_data_1",
             filename="test1.png",
             node=node1
         )
-        image2 = ComfyImage(
+        image2 = ComfyOutput(
             data=b"fake_image_data_2",
             filename="test2.png", 
             node=node2
@@ -966,27 +973,27 @@ class TestMediaCollection:
         media.append(image2)
         
         # Test finding by title
-        found_image = media.find_by_title("KSampler")
-        assert found_image == image1
-        assert found_image.node.title == "KSampler"
+        found_output = media.find_by_title("KSampler")
+        assert found_output == image1
+        assert found_output.node.title == "KSampler"
     
     def test_media_collection_find_by_title_no_match(self, example_api_workflow_file_path):
         """Test that find_by_title raises KeyError when no match is found."""
         workflow = Workflow.from_file(example_api_workflow_file_path)
         
         node = workflow.node(id="31")  # KSampler node
-        image = ComfyImage(
-            data=b"fake_image_data",
+        output = ComfyOutput(
+            data=b"fake_output_data",
             filename="test.png",
             node=node
         )
         
         from comfy_commander import MediaCollection
         media = MediaCollection()
-        media.append(image)
+        media.append(output)
         
         # Test that KeyError is raised for non-existent title
-        with pytest.raises(KeyError, match="No image found with node title 'NonExistentTitle'"):
+        with pytest.raises(KeyError, match="No output found with node title 'NonExistentTitle'"):
             media.find_by_title("NonExistentTitle")
     
     def test_media_collection_find_by_title_multiple_matches(self):
@@ -1011,12 +1018,12 @@ class TestMediaCollection:
         node1 = workflow.node(id="1")
         node2 = workflow.node(id="2")
         
-        image1 = ComfyImage(
+        image1 = ComfyOutput(
             data=b"fake_image_data_1",
             filename="test1.png",
             node=node1
         )
-        image2 = ComfyImage(
+        image2 = ComfyOutput(
             data=b"fake_image_data_2",
             filename="test2.png",
             node=node2
@@ -1028,15 +1035,15 @@ class TestMediaCollection:
         media.append(image2)
         
         # Test that ValueError is raised for multiple matches
-        with pytest.raises(ValueError, match="Multiple images found with node title 'Duplicate Title': 2 matches"):
+        with pytest.raises(ValueError, match="Multiple outputs found with node title 'Duplicate Title': 2 matches"):
             media.find_by_title("Duplicate Title")
     
     def test_media_collection_find_by_title_no_node(self):
         """Test that find_by_title handles images without nodes."""
-        from comfy_commander import MediaCollection, ComfyImage
+        from comfy_commander import MediaCollection, ComfyOutput
         
         # Create image without a node
-        image = ComfyImage(
+        image = ComfyOutput(
             data=b"fake_image_data",
             filename="test.png",
             node=None
@@ -1046,16 +1053,16 @@ class TestMediaCollection:
         media.append(image)
         
         # Test that KeyError is raised when no node is present
-        with pytest.raises(KeyError, match="No image found with node title 'SomeTitle'"):
+        with pytest.raises(KeyError, match="No output found with node title 'SomeTitle'"):
             media.find_by_title("SomeTitle")
     
     def test_media_collection_extend(self):
         """Test extending MediaCollection with multiple images."""
-        from comfy_commander import MediaCollection, ComfyImage
+        from comfy_commander import MediaCollection, ComfyOutput
         
-        image1 = ComfyImage(data=b"data1", filename="test1.png")
-        image2 = ComfyImage(data=b"data2", filename="test2.png")
-        image3 = ComfyImage(data=b"data3", filename="test3.png")
+        image1 = ComfyOutput(data=b"data1", filename="test1.png")
+        image2 = ComfyOutput(data=b"data2", filename="test2.png")
+        image3 = ComfyOutput(data=b"data3", filename="test3.png")
         
         media = MediaCollection()
         media.append(image1)
@@ -1068,25 +1075,25 @@ class TestMediaCollection:
     
     def test_media_collection_repr(self):
         """Test MediaCollection string representation."""
-        from comfy_commander import MediaCollection, ComfyImage
+        from comfy_commander import MediaCollection, ComfyOutput
         
         media = MediaCollection()
-        assert repr(media) == "MediaCollection(0 images)"
+        assert repr(media) == "MediaCollection(0 outputs)"
         
-        image = ComfyImage(data=b"data", filename="test.png")
+        image = ComfyOutput(data=b"data", filename="test.png")
         media.append(image)
-        assert repr(media) == "MediaCollection(1 images)"
+        assert repr(media) == "MediaCollection(1 outputs)"
         
         media.append(image)
-        assert repr(media) == "MediaCollection(2 images)"
+        assert repr(media) == "MediaCollection(2 outputs)"
     
     def test_execution_result_with_media_collection(self, example_api_workflow_file_path):
         """Test that ExecutionResult properly uses MediaCollection."""
         workflow = Workflow.from_file(example_api_workflow_file_path)
         
         node = workflow.node(id="31")
-        image = ComfyImage(
-            data=b"fake_image_data",
+        output = ComfyOutput(
+            data=b"fake_output_data",
             filename="test.png",
             node=node
         )
@@ -1094,7 +1101,7 @@ class TestMediaCollection:
         from comfy_commander import MediaCollection, ExecutionResult
         
         media = MediaCollection()
-        media.append(image)
+        media.append(output)
         
         result = ExecutionResult(
             prompt_id="test_123",
@@ -1105,11 +1112,106 @@ class TestMediaCollection:
         # Test that we can iterate over result.media
         images_list = list(result.media)
         assert len(images_list) == 1
-        assert images_list[0] == image
+        assert images_list[0] == output
         
         # Test that we can find by title
-        found_image = result.media.find_by_title("KSampler")
-        assert found_image == image
+        found_output = result.media.find_by_title("KSampler")
+        assert found_output == output
         
         # Test that result.media is a MediaCollection
         assert isinstance(result.media, MediaCollection)
+    
+    def test_media_collection_filter_by_type(self):
+        """Test filtering MediaCollection by output type."""
+        from comfy_commander import MediaCollection, ComfyOutput
+        
+        # Create outputs with different types
+        output1 = ComfyOutput(data=b"data1", filename="test1.png", type="output")
+        output2 = ComfyOutput(data=b"data2", filename="test2.mp4", type="temp")
+        output3 = ComfyOutput(data=b"data3", filename="test3.wav", type="output")
+        output4 = ComfyOutput(data=b"data4", filename="test4.gif", type="temp")
+        
+        media = MediaCollection()
+        media.extend([output1, output2, output3, output4])
+        
+        # Test filtering by type
+        output_media = media.filter_by_type("output")
+        temp_media = media.filter_by_type("temp")
+        
+        assert len(output_media) == 2
+        assert len(temp_media) == 2
+        
+        # Test convenience properties
+        assert media.output_media == output_media
+        assert media.temp_media == temp_media
+        
+        # Verify the correct outputs are in each collection
+        assert output1 in output_media
+        assert output3 in output_media
+        assert output2 in temp_media
+        assert output4 in temp_media
+    
+    def test_comfy_output_save_as(self):
+        """Test ComfyOutput save_as method with automatic extension."""
+        import tempfile
+        import os
+        
+        # Create test outputs with different file types
+        png_output = ComfyOutput(data=b"fake_png_data", filename="test.png")
+        mp4_output = ComfyOutput(data=b"fake_mp4_data", filename="test.mp4")
+        wav_output = ComfyOutput(data=b"fake_wav_data", filename="test.wav")
+        unknown_output = ComfyOutput(data=b"fake_data", filename="test.xyz")
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Test PNG output
+            png_path = png_output.save_as(os.path.join(temp_dir, "my_image"))
+            assert png_path.endswith(".png")
+            assert os.path.exists(png_path)
+            
+            # Test MP4 output
+            mp4_path = mp4_output.save_as(os.path.join(temp_dir, "my_video"))
+            assert mp4_path.endswith(".mp4")
+            assert os.path.exists(mp4_path)
+            
+            # Test WAV output
+            wav_path = wav_output.save_as(os.path.join(temp_dir, "my_audio"))
+            assert wav_path.endswith(".wav")
+            assert os.path.exists(wav_path)
+            
+            # Test unknown output (should use original extension)
+            unknown_path = unknown_output.save_as(os.path.join(temp_dir, "my_file"))
+            assert unknown_path.endswith(".xyz")
+            assert os.path.exists(unknown_path)
+    
+    def test_comfy_output_save_as_without_extension(self):
+        """Test ComfyOutput save_as method when filename has no extension."""
+        import tempfile
+        import os
+        
+        # Create outputs without file extensions but with proper data signatures
+        # Create actual PNG data
+        png_data = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\tpHYs\x00\x00\x0b\x13\x00\x00\x0b\x13\x01\x00\x9a\x9c\x18\x00\x00\x00\nIDATx\x9cc```\x00\x00\x00\x04\x00\x01\xdd\x8d\xb4\x1c\x00\x00\x00\x00IEND\xaeB`\x82'
+        # Create actual WAV data
+        wav_data = b'RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00\x44\xac\x00\x00\x88X\x01\x00\x02\x00\x10\x00data\x00\x00\x00\x00'
+        # Create actual MP4 data
+        mp4_data = b'\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom'
+        
+        image_output = ComfyOutput(data=png_data, filename="test")
+        video_output = ComfyOutput(data=mp4_data, filename="test")
+        audio_output = ComfyOutput(data=wav_data, filename="test")
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Test image output (should default to .png)
+            image_path = image_output.save_as(os.path.join(temp_dir, "my_image"))
+            assert image_path.endswith(".png")
+            assert os.path.exists(image_path)
+            
+            # Test video output (should default to .mp4)
+            video_path = video_output.save_as(os.path.join(temp_dir, "my_video"))
+            assert video_path.endswith(".mp4")
+            assert os.path.exists(video_path)
+            
+            # Test audio output (should default to .wav)
+            audio_path = audio_output.save_as(os.path.join(temp_dir, "my_audio"))
+            assert audio_path.endswith(".wav")
+            assert os.path.exists(audio_path)
