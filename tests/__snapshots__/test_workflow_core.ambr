@@ -1,5 +1,5 @@
 # serializer version: 1
-# name: TestWorkflows.test_can_load_workflow_from_example_image
+# name: TestWorkflowCore.test_can_load_workflow_from_example_image
   dict({
     '27': dict({
       '_meta': dict({
@@ -161,7 +161,7 @@
     }),
   })
 # ---
-# name: TestWorkflows.test_can_load_workflow_from_example_image.1
+# name: TestWorkflowCore.test_can_load_workflow_from_example_image.1
   dict({
     'config': dict({
     }),
