@@ -17,7 +17,7 @@ class TestComfyUIServer:
         """Test server initialization with default values."""
         server = ComfyUIServer()
         assert server.base_url == "http://localhost:8188"
-        assert server.timeout == 30
+        assert server.timeout is None
     
     def test_server_initialization_custom_url(self):
         """Test server initialization with custom URL."""
@@ -76,7 +76,7 @@ class TestComfyUIServer:
         mock_post.assert_called_once_with(
             "http://localhost:8188/workflow/convert",
             json=workflow_data,
-            timeout=30
+            timeout=None
         )
     
     @patch('requests.post')
@@ -110,7 +110,7 @@ class TestComfyUIServer:
         mock_post.assert_called_once_with(
             "http://localhost:8188/prompt",
             json={"prompt": api_workflow, "client_id": "test-client"},
-            timeout=30
+            timeout=None
         )
     
     @patch('requests.get')
@@ -125,7 +125,7 @@ class TestComfyUIServer:
         result = server.get_queue_status()
         
         assert result == {"queue_running": [], "queue_pending": []}
-        mock_get.assert_called_once_with("http://localhost:8188/queue", timeout=30)
+        mock_get.assert_called_once_with("http://localhost:8188/queue", timeout=None)
     
     @patch('requests.get')
     def test_get_history_success(self, mock_get):
@@ -139,7 +139,7 @@ class TestComfyUIServer:
         result = server.get_history("test-prompt-123")
         
         assert result == {"test-prompt-123": {"status": "success"}}
-        mock_get.assert_called_once_with("http://localhost:8188/history/test-prompt-123", timeout=30)
+        mock_get.assert_called_once_with("http://localhost:8188/history/test-prompt-123", timeout=None)
     
     @patch('requests.get')
     def test_get_history_all_success(self, mock_get):
@@ -153,7 +153,7 @@ class TestComfyUIServer:
         result = server.get_history()
         
         assert result == {"test-prompt-123": {"status": "success"}}
-        mock_get.assert_called_once_with("http://localhost:8188/history", timeout=30)
+        mock_get.assert_called_once_with("http://localhost:8188/history", timeout=None)
 
 
 class TestWorkflow:

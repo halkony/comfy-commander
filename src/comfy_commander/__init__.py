@@ -5,7 +5,7 @@ This package provides tools to edit ComfyUI nodes and their values from Python,
 supporting both local and remote ComfyUI instances.
 """
 
-from .core import Workflow, ComfyUIServer, ComfyImage, ExecutionResult
+from .core import Workflow, ComfyUIServer, ComfyImage, ExecutionResult, MediaCollection, Node
 
 __version__ = "0.1.0"
-__all__ = ["Workflow", "ComfyUIServer", "ComfyImage", "ExecutionResult"]
+__all__ = ["Workflow", "ComfyUIServer", "ComfyImage", "ExecutionResult", "MediaCollection", "Node"]

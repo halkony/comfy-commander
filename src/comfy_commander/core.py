@@ -21,6 +21,7 @@ class ComfyImage:
     filename: str = attrs.field(default="")
     subfolder: str = attrs.field(default="")
     type: str = attrs.field(default="output")
+    node: Optional["Node"] = attrs.field(default=None)
     _workflow: Optional["Workflow"] = attrs.field(default=None, init=False)
     
     def save(self, filepath: str, workflow: Optional["Workflow"] = None) -> None:
@@ -59,10 +60,67 @@ class ComfyImage:
         return f"ComfyImage(filename='{self.filename}', size={len(self.data)} bytes, type='{self.type}')"
     
     @classmethod
-    def from_base64(cls, base64_data: str, filename: str = "", subfolder: str = "", type: str = "output") -> "ComfyImage":
+    def from_base64(cls, base64_data: str, filename: str = "", subfolder: str = "", type: str = "output", node: Optional["Node"] = None) -> "ComfyImage":
         """Create a ComfyImage from base64 encoded data."""
         data = base64.b64decode(base64_data)
-        return cls(data=data, filename=filename, subfolder=subfolder, type=type)
+        return cls(data=data, filename=filename, subfolder=subfolder, type=type, node=node)
+
+
+@attrs.define
+class MediaCollection:
+    """Custom collection for ComfyImage objects with search capabilities."""
+    
+    _images: List[ComfyImage] = attrs.field(default=attrs.Factory(list))
+    
+    def __iter__(self):
+        """Allow iteration over the images."""
+        return iter(self._images)
+    
+    def __len__(self):
+        """Return the number of images."""
+        return len(self._images)
+    
+    def __getitem__(self, index):
+        """Allow indexing into the collection."""
+        return self._images[index]
+    
+    def __repr__(self) -> str:
+        """String representation of the collection."""
+        return f"MediaCollection({len(self._images)} images)"
+    
+    def append(self, image: ComfyImage) -> None:
+        """Add an image to the collection."""
+        self._images.append(image)
+    
+    def extend(self, images: List[ComfyImage]) -> None:
+        """Add multiple images to the collection."""
+        self._images.extend(images)
+    
+    def find_by_title(self, title: str) -> ComfyImage:
+        """Find a ComfyImage by its node's title property.
+        
+        Args:
+            title: The title to search for (exact match)
+            
+        Returns:
+            The first ComfyImage with a matching node title
+            
+        Raises:
+            KeyError: If no image with the given title is found
+            ValueError: If multiple images with the same title are found
+        """
+        matching_images = []
+        
+        for image in self._images:
+            if image.node and image.node.title == title:
+                matching_images.append(image)
+        
+        if len(matching_images) == 0:
+            raise KeyError(f"No image found with node title '{title}'")
+        elif len(matching_images) > 1:
+            raise ValueError(f"Multiple images found with node title '{title}': {len(matching_images)} matches")
+        else:
+            return matching_images[0]
 
 
 @attrs.define
@@ -70,7 +128,7 @@ class ExecutionResult:
     """Represents the result of a workflow execution."""
     
     prompt_id: str = attrs.field()
-    media: List[ComfyImage] = attrs.field(default=attrs.Factory(list))
+    media: MediaCollection = attrs.field(default=attrs.Factory(MediaCollection))
     status: str = attrs.field(default="success")
     error_message: Optional[str] = attrs.field(default=None)
     
@@ -592,6 +650,15 @@ class ComfyUIServer:
         images = []
         for node_id, node_output in outputs.items():
             if "images" in node_output:
+                # Create a Node object for this output if workflow is available
+                node = None
+                if workflow is not None:
+                    try:
+                        node = workflow.node(id=node_id)
+                    except KeyError:
+                        # Node not found in workflow, create a basic Node object
+                        node = Node(id=node_id, workflow=workflow)
+                
                 for image_info in node_output["images"]:
                     # Get the image data from ComfyUI
                     image_url = f"{self.base_url}/view"
@@ -608,7 +675,8 @@ class ComfyUIServer:
                         data=response.content,
                         filename=image_info["filename"],
                         subfolder=image_info.get("subfolder", ""),
-                        type=image_info.get("type", "output")
+                        type=image_info.get("type", "output"),
+                        node=node
                     )
                     
                     # Store workflow reference for later use when saving
@@ -706,14 +774,55 @@ class ComfyUIServer:
         # Execute the workflow
         prompt_id = self._send_workflow_to_server(workflow.api_json, client_id)
         
-        # Check if we're in an async context
+        # Check if we're in an async context (like Jupyter notebook)
         try:
             loop = asyncio.get_running_loop()
-            # We're in an async context, so we need to run the async version
-            return asyncio.create_task(self._execute_async_internal(prompt_id, poll_interval, timeout, workflow))
-        except RuntimeError:
+            # We're in an async context - use nest_asyncio to allow nested event loops
+            try:
+                import nest_asyncio
+                nest_asyncio.apply()
+                return loop.run_until_complete(self._execute_async_internal(prompt_id, poll_interval, timeout, workflow))
+            except ImportError:
+                # nest_asyncio not available - provide helpful error message
+                raise RuntimeError(
+                    "Cannot run execute() in an async context (like Jupyter notebook) without nest_asyncio. "
+                    "Please install nest_asyncio with 'pip install nest_asyncio' or use the async version: "
+                    "await server.execute_async(workflow)"
+                )
+        except RuntimeError as e:
+            if "Cannot run execute()" in str(e):
+                raise
             # No event loop running, we're in sync context - run async code in sync
             return asyncio.run(self._execute_async_internal(prompt_id, poll_interval, timeout, workflow))
+    
+    async def execute_async(self, workflow: "Workflow", client_id: str = "comfy-commander", 
+                           poll_interval: float = 1.0, timeout: Optional[float] = None) -> ExecutionResult:
+        """Execute a workflow on this server and wait for completion (async version).
+        
+        This is the async version of execute() that can be used directly in async contexts
+        like Jupyter notebooks without needing nest_asyncio.
+        
+        Args:
+            workflow: The workflow to execute
+            client_id: Client identifier for the execution
+            poll_interval: How often to check for completion (seconds)
+            timeout: Maximum time to wait for completion (seconds). If None, wait indefinitely.
+            
+        Returns:
+            ExecutionResult with images and execution status
+            
+        Raises:
+            ConnectionError: If server is not available
+            requests.RequestException: If execution fails
+        """
+        # Ensure the workflow has proper API format
+        workflow.ensure_api_format(self)
+        
+        # Execute the workflow
+        prompt_id = self._send_workflow_to_server(workflow.api_json, client_id)
+        
+        # Run the async execution
+        return await self._execute_async_internal(prompt_id, poll_interval, timeout, workflow)
     
     async def _execute_async_internal(self, prompt_id: str, poll_interval: float, timeout: float, workflow: "Workflow") -> ExecutionResult:
         """Internal async execution method."""
@@ -724,16 +833,18 @@ class ComfyUIServer:
             # Get the output images with workflow metadata
             images = self.get_output_images(prompt_id, workflow)
             
+            media_collection = MediaCollection()
+            media_collection.extend(images)
             return ExecutionResult(
                 prompt_id=prompt_id,
-                media=images,
+                media=media_collection,
                 status="success"
             )
             
         except Exception as e:
             return ExecutionResult(
                 prompt_id=prompt_id,
-                media=[],
+                media=MediaCollection(),
                 status="error",
                 error_message=str(e)
             )

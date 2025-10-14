@@ -640,7 +640,7 @@ class TestWorkflows:
              patch.object(ComfyUIServer, 'get_output_images', return_value=[ComfyImage(data=b"fake_image", filename="test_output.png")]):
             
             # Execute in async mode
-            result = await server.execute(workflow)
+            result = await server.execute_async(workflow)
             
             # Should return ExecutionResult
             assert isinstance(result, ExecutionResult)
@@ -667,7 +667,7 @@ class TestWorkflows:
              patch.object(ComfyUIServer, 'wait_for_completion', side_effect=RuntimeError("Execution failed")):
             
             # Execute in async mode
-            result = await server.execute(workflow)
+            result = await server.execute_async(workflow)
             
             # Should return ExecutionResult with error
             assert isinstance(result, ExecutionResult)
@@ -675,3 +675,441 @@ class TestWorkflows:
             assert result.status == "error"
             assert "Execution failed" in result.error_message
             assert len(result.media) == 0
+
+
+class TestComfyImageNodeAttribute:
+    """Test ComfyImage node attribute functionality."""
+    
+    def test_comfyimage_creation_with_node(self, example_api_workflow_file_path):
+        """Test creating ComfyImage with node reference."""
+        workflow = Workflow.from_file(example_api_workflow_file_path)
+        node = workflow.node(id="31")  # KSampler node
+        
+        image_data = b"fake_image_data"
+        image = ComfyImage(
+            data=image_data,
+            filename="test.png",
+            subfolder="output",
+            type="output",
+            node=node
+        )
+        
+        assert image.node is not None
+        assert image.node.id == "31"
+        assert image.node.class_type == "KSampler"
+        assert image.node.workflow == workflow
+    
+    def test_comfyimage_creation_without_node(self):
+        """Test creating ComfyImage without node reference."""
+        image_data = b"fake_image_data"
+        image = ComfyImage(
+            data=image_data,
+            filename="test.png",
+            subfolder="output",
+            type="output"
+        )
+        
+        assert image.node is None
+    
+    def test_comfyimage_from_base64_with_node(self, example_api_workflow_file_path):
+        """Test creating ComfyImage from base64 with node reference."""
+        workflow = Workflow.from_file(example_api_workflow_file_path)
+        node = workflow.node(id="31")  # KSampler node
+        
+        import base64
+        image_data = b"fake_image_data"
+        base64_data = base64.b64encode(image_data).decode('utf-8')
+        
+        image = ComfyImage.from_base64(
+            base64_data=base64_data,
+            filename="test.png",
+            subfolder="output",
+            type="output",
+            node=node
+        )
+        
+        assert image.node is not None
+        assert image.node.id == "31"
+        assert image.node.class_type == "KSampler"
+    
+    def test_comfyimage_from_base64_without_node(self):
+        """Test creating ComfyImage from base64 without node reference."""
+        import base64
+        image_data = b"fake_image_data"
+        base64_data = base64.b64encode(image_data).decode('utf-8')
+        
+        image = ComfyImage.from_base64(
+            base64_data=base64_data,
+            filename="test.png",
+            subfolder="output",
+            type="output"
+        )
+        
+        assert image.node is None
+    
+    @patch('requests.get')
+    def test_get_output_images_sets_node_reference(self, mock_get, example_api_workflow_file_path):
+        """Test that get_output_images sets node reference correctly."""
+        # Mock the image data response
+        mock_response = Mock()
+        mock_response.content = b"fake_image_data"
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+        
+        # Mock the history response
+        mock_history = {
+            "test_prompt_123": {
+                "outputs": {
+                    "31": {  # KSampler node
+                        "images": [
+                            {
+                                "filename": "test_output.png",
+                                "subfolder": "output",
+                                "type": "output"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        
+        server = ComfyUIServer()
+        workflow = Workflow.from_file(example_api_workflow_file_path)
+        
+        # Mock the get_history method using patch
+        with patch.object(ComfyUIServer, 'get_history', return_value=mock_history):
+            images = server.get_output_images("test_prompt_123", workflow)
+        
+        assert len(images) == 1
+        image = images[0]
+        
+        # Check that node reference is set correctly
+        assert image.node is not None
+        assert image.node.id == "31"
+        assert image.node.class_type == "KSampler"
+        assert image.node.workflow == workflow
+    
+    @patch('requests.get')
+    def test_get_output_images_without_workflow(self, mock_get):
+        """Test that get_output_images works without workflow (node should be None)."""
+        # Mock the image data response
+        mock_response = Mock()
+        mock_response.content = b"fake_image_data"
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+        
+        # Mock the history response
+        mock_history = {
+            "test_prompt_123": {
+                "outputs": {
+                    "31": {  # KSampler node
+                        "images": [
+                            {
+                                "filename": "test_output.png",
+                                "subfolder": "output",
+                                "type": "output"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        
+        server = ComfyUIServer()
+        
+        # Mock the get_history method using patch
+        with patch.object(ComfyUIServer, 'get_history', return_value=mock_history):
+            images = server.get_output_images("test_prompt_123", None)
+        
+        assert len(images) == 1
+        image = images[0]
+        
+        # Check that node reference is None when no workflow provided
+        assert image.node is None
+    
+    @patch('requests.get')
+    def test_get_output_images_node_not_in_workflow(self, mock_get, example_api_workflow_file_path):
+        """Test that get_output_images handles case where node is not in workflow."""
+        # Mock the image data response
+        mock_response = Mock()
+        mock_response.content = b"fake_image_data"
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+        
+        # Mock the history response with a node ID that doesn't exist in workflow
+        mock_history = {
+            "test_prompt_123": {
+                "outputs": {
+                    "999": {  # Non-existent node
+                        "images": [
+                            {
+                                "filename": "test_output.png",
+                                "subfolder": "output",
+                                "type": "output"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        
+        server = ComfyUIServer()
+        workflow = Workflow.from_file(example_api_workflow_file_path)
+        
+        # Mock the get_history method using patch
+        with patch.object(ComfyUIServer, 'get_history', return_value=mock_history):
+            images = server.get_output_images("test_prompt_123", workflow)
+        
+        assert len(images) == 1
+        image = images[0]
+        
+        # Check that a basic Node object is created for non-existent node
+        assert image.node is not None
+        assert image.node.id == "999"
+        assert image.node.workflow == workflow
+        # The class_type should be empty since it's not in the workflow
+        assert image.node.class_type == ""
+    
+    def test_comfyimage_node_access_properties(self, example_api_workflow_file_path):
+        """Test accessing node properties through ComfyImage."""
+        workflow = Workflow.from_file(example_api_workflow_file_path)
+        node = workflow.node(id="31")  # KSampler node
+        
+        image_data = b"fake_image_data"
+        image = ComfyImage(
+            data=image_data,
+            filename="test.png",
+            subfolder="output",
+            type="output",
+            node=node
+        )
+        
+        # Test accessing node properties through the image
+        assert image.node.class_type == "KSampler"
+        assert image.node.id == "31"
+        
+        # Test accessing node parameters
+        seed_value = image.node.param("seed").value
+        assert seed_value is not None
+        
+        # Test modifying node parameters through the image
+        image.node.param("seed").set(999999)
+        assert image.node.param("seed").value == 999999
+        
+        # Verify the change is reflected in the workflow
+        assert workflow.node(id="31").param("seed").value == 999999
+
+
+class TestMediaCollection:
+    """Test the MediaCollection class functionality."""
+    
+    def test_media_collection_iteration(self, example_api_workflow_file_path):
+        """Test that MediaCollection can be iterated over like a list."""
+        workflow = Workflow.from_file(example_api_workflow_file_path)
+        
+        # Create some test images with nodes
+        node1 = workflow.node(id="31")  # KSampler node
+        node2 = workflow.node(id="6")   # CLIPTextEncode node
+        
+        image1 = ComfyImage(
+            data=b"fake_image_data_1",
+            filename="test1.png",
+            node=node1
+        )
+        image2 = ComfyImage(
+            data=b"fake_image_data_2", 
+            filename="test2.png",
+            node=node2
+        )
+        
+        # Create MediaCollection and add images
+        from comfy_commander import MediaCollection
+        media = MediaCollection()
+        media.append(image1)
+        media.append(image2)
+        
+        # Test iteration
+        images_list = list(media)
+        assert len(images_list) == 2
+        assert images_list[0] == image1
+        assert images_list[1] == image2
+        
+        # Test len
+        assert len(media) == 2
+        
+        # Test indexing
+        assert media[0] == image1
+        assert media[1] == image2
+    
+    def test_media_collection_find_by_title_success(self, example_api_workflow_file_path):
+        """Test finding an image by node title successfully."""
+        workflow = Workflow.from_file(example_api_workflow_file_path)
+        
+        # Create test images with nodes that have titles
+        node1 = workflow.node(id="31")  # KSampler node with title "KSampler"
+        node2 = workflow.node(id="6")   # CLIPTextEncode node
+        
+        image1 = ComfyImage(
+            data=b"fake_image_data_1",
+            filename="test1.png",
+            node=node1
+        )
+        image2 = ComfyImage(
+            data=b"fake_image_data_2",
+            filename="test2.png", 
+            node=node2
+        )
+        
+        from comfy_commander import MediaCollection
+        media = MediaCollection()
+        media.append(image1)
+        media.append(image2)
+        
+        # Test finding by title
+        found_image = media.find_by_title("KSampler")
+        assert found_image == image1
+        assert found_image.node.title == "KSampler"
+    
+    def test_media_collection_find_by_title_no_match(self, example_api_workflow_file_path):
+        """Test that find_by_title raises KeyError when no match is found."""
+        workflow = Workflow.from_file(example_api_workflow_file_path)
+        
+        node = workflow.node(id="31")  # KSampler node
+        image = ComfyImage(
+            data=b"fake_image_data",
+            filename="test.png",
+            node=node
+        )
+        
+        from comfy_commander import MediaCollection
+        media = MediaCollection()
+        media.append(image)
+        
+        # Test that KeyError is raised for non-existent title
+        with pytest.raises(KeyError, match="No image found with node title 'NonExistentTitle'"):
+            media.find_by_title("NonExistentTitle")
+    
+    def test_media_collection_find_by_title_multiple_matches(self):
+        """Test that find_by_title raises ValueError when multiple matches are found."""
+        # Create a mock workflow with duplicate titles
+        api_json = {
+            "1": {
+                "class_type": "KSampler",
+                "_meta": {"title": "Duplicate Title"},
+                "inputs": {"seed": 123}
+            },
+            "2": {
+                "class_type": "KSampler",
+                "_meta": {"title": "Duplicate Title"},
+                "inputs": {"seed": 456}
+            }
+        }
+        
+        workflow = Workflow(api_json=api_json, gui_json=None)
+        
+        # Create images with nodes that have the same title
+        node1 = workflow.node(id="1")
+        node2 = workflow.node(id="2")
+        
+        image1 = ComfyImage(
+            data=b"fake_image_data_1",
+            filename="test1.png",
+            node=node1
+        )
+        image2 = ComfyImage(
+            data=b"fake_image_data_2",
+            filename="test2.png",
+            node=node2
+        )
+        
+        from comfy_commander import MediaCollection
+        media = MediaCollection()
+        media.append(image1)
+        media.append(image2)
+        
+        # Test that ValueError is raised for multiple matches
+        with pytest.raises(ValueError, match="Multiple images found with node title 'Duplicate Title': 2 matches"):
+            media.find_by_title("Duplicate Title")
+    
+    def test_media_collection_find_by_title_no_node(self):
+        """Test that find_by_title handles images without nodes."""
+        from comfy_commander import MediaCollection, ComfyImage
+        
+        # Create image without a node
+        image = ComfyImage(
+            data=b"fake_image_data",
+            filename="test.png",
+            node=None
+        )
+        
+        media = MediaCollection()
+        media.append(image)
+        
+        # Test that KeyError is raised when no node is present
+        with pytest.raises(KeyError, match="No image found with node title 'SomeTitle'"):
+            media.find_by_title("SomeTitle")
+    
+    def test_media_collection_extend(self):
+        """Test extending MediaCollection with multiple images."""
+        from comfy_commander import MediaCollection, ComfyImage
+        
+        image1 = ComfyImage(data=b"data1", filename="test1.png")
+        image2 = ComfyImage(data=b"data2", filename="test2.png")
+        image3 = ComfyImage(data=b"data3", filename="test3.png")
+        
+        media = MediaCollection()
+        media.append(image1)
+        media.extend([image2, image3])
+        
+        assert len(media) == 3
+        assert media[0] == image1
+        assert media[1] == image2
+        assert media[2] == image3
+    
+    def test_media_collection_repr(self):
+        """Test MediaCollection string representation."""
+        from comfy_commander import MediaCollection, ComfyImage
+        
+        media = MediaCollection()
+        assert repr(media) == "MediaCollection(0 images)"
+        
+        image = ComfyImage(data=b"data", filename="test.png")
+        media.append(image)
+        assert repr(media) == "MediaCollection(1 images)"
+        
+        media.append(image)
+        assert repr(media) == "MediaCollection(2 images)"
+    
+    def test_execution_result_with_media_collection(self, example_api_workflow_file_path):
+        """Test that ExecutionResult properly uses MediaCollection."""
+        workflow = Workflow.from_file(example_api_workflow_file_path)
+        
+        node = workflow.node(id="31")
+        image = ComfyImage(
+            data=b"fake_image_data",
+            filename="test.png",
+            node=node
+        )
+        
+        from comfy_commander import MediaCollection, ExecutionResult
+        
+        media = MediaCollection()
+        media.append(image)
+        
+        result = ExecutionResult(
+            prompt_id="test_123",
+            media=media,
+            status="success"
+        )
+        
+        # Test that we can iterate over result.media
+        images_list = list(result.media)
+        assert len(images_list) == 1
+        assert images_list[0] == image
+        
+        # Test that we can find by title
+        found_image = result.media.find_by_title("KSampler")
+        assert found_image == image
+        
+        # Test that result.media is a MediaCollection
+        assert isinstance(result.media, MediaCollection)
