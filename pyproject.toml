@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "comfy-commander"
-version = "0.1.1"
+version = "0.1.2"
 description = "A package for programmatically running ComfyUI workloads either locally or remotely"
 readme = "README.md"
 requires-python = ">=3.8"
