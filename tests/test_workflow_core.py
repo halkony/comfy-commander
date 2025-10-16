@@ -115,3 +115,205 @@ class TestWorkflowCore:
                 except PermissionError:
                     # On Windows, sometimes the file is still locked
                     pass
+
+    def test_load_api_json_from_file(self):
+        """Test loading API JSON data from a file."""
+        # Create test API JSON data
+        api_data = {
+            "1": {
+                "class_type": "KSampler",
+                "inputs": {"seed": 123, "steps": 20, "cfg": 7.0}
+            },
+            "2": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {"text": "test prompt"}
+            }
+        }
+        
+        # Create temporary file with API JSON
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_file:
+            json.dump(api_data, tmp_file)
+            tmp_path = tmp_file.name
+        
+        try:
+            # Create empty workflow
+            workflow = Workflow(api_json=None, gui_json=None)
+            assert workflow.api_json is None
+            
+            # Load API JSON from file
+            workflow.load_api_json(tmp_path)
+            
+            # Verify the data was loaded correctly
+            assert workflow.api_json is not None
+            assert workflow.api_json == api_data
+            assert "1" in workflow.api_json
+            assert "2" in workflow.api_json
+            assert workflow.api_json["1"]["class_type"] == "KSampler"
+            assert workflow.api_json["2"]["class_type"] == "CLIPTextEncode"
+            
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except PermissionError:
+                    # On Windows, sometimes the file is still locked
+                    pass
+
+    def test_load_gui_json_from_file(self):
+        """Test loading GUI JSON data from a file."""
+        # Create test GUI JSON data
+        gui_data = {
+            "nodes": [
+                {
+                    "id": 1,
+                    "type": "KSampler",
+                    "widgets_values": [123, False, 20, 7.0]
+                },
+                {
+                    "id": 2,
+                    "type": "CLIPTextEncode",
+                    "widgets_values": ["test prompt"]
+                }
+            ],
+            "links": [
+                {"from": 1, "to": 2, "from_slot": 0, "to_slot": 0}
+            ]
+        }
+        
+        # Create temporary file with GUI JSON
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_file:
+            json.dump(gui_data, tmp_file)
+            tmp_path = tmp_file.name
+        
+        try:
+            # Create empty workflow
+            workflow = Workflow(api_json=None, gui_json=None)
+            assert workflow.gui_json is None
+            
+            # Load GUI JSON from file
+            workflow.load_gui_json(tmp_path)
+            
+            # Verify the data was loaded correctly
+            assert workflow.gui_json is not None
+            assert workflow.gui_json == gui_data
+            assert "nodes" in workflow.gui_json
+            assert "links" in workflow.gui_json
+            assert len(workflow.gui_json["nodes"]) == 2
+            assert len(workflow.gui_json["links"]) == 1
+            
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except PermissionError:
+                    # On Windows, sometimes the file is still locked
+                    pass
+
+    def test_load_api_json_file_not_found(self):
+        """Test that load_api_json raises FileNotFoundError for non-existent file."""
+        workflow = Workflow(api_json=None, gui_json=None)
+        
+        with pytest.raises(FileNotFoundError):
+            workflow.load_api_json("non_existent_file.json")
+
+    def test_load_gui_json_file_not_found(self):
+        """Test that load_gui_json raises FileNotFoundError for non-existent file."""
+        workflow = Workflow(api_json=None, gui_json=None)
+        
+        with pytest.raises(FileNotFoundError):
+            workflow.load_gui_json("non_existent_file.json")
+
+    def test_load_api_json_invalid_json(self):
+        """Test that load_api_json raises JSONDecodeError for invalid JSON."""
+        # Create temporary file with invalid JSON
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_file:
+            tmp_file.write("invalid json content {")
+            tmp_path = tmp_file.name
+        
+        try:
+            workflow = Workflow(api_json=None, gui_json=None)
+            
+            with pytest.raises(json.JSONDecodeError):
+                workflow.load_api_json(tmp_path)
+                
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except PermissionError:
+                    # On Windows, sometimes the file is still locked
+                    pass
+
+    def test_load_gui_json_invalid_json(self):
+        """Test that load_gui_json raises JSONDecodeError for invalid JSON."""
+        # Create temporary file with invalid JSON
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_file:
+            tmp_file.write("invalid json content {")
+            tmp_path = tmp_file.name
+        
+        try:
+            workflow = Workflow(api_json=None, gui_json=None)
+            
+            with pytest.raises(json.JSONDecodeError):
+                workflow.load_gui_json(tmp_path)
+                
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except PermissionError:
+                    # On Windows, sometimes the file is still locked
+                    pass
+
+    def test_load_both_api_and_gui_json(self):
+        """Test loading both API and GUI JSON into the same workflow."""
+        # Create test data
+        api_data = {
+            "1": {
+                "class_type": "KSampler",
+                "inputs": {"seed": 456, "steps": 25}
+            }
+        }
+        
+        gui_data = {
+            "nodes": [
+                {
+                    "id": 1,
+                    "type": "KSampler",
+                    "widgets_values": [456, False, 25, 7.0]
+                }
+            ],
+            "links": []
+        }
+        
+        # Create temporary files
+        with tempfile.NamedTemporaryFile(mode='w', suffix='_api.json', delete=False) as api_file:
+            json.dump(api_data, api_file)
+            api_path = api_file.name
+            
+        with tempfile.NamedTemporaryFile(mode='w', suffix='_gui.json', delete=False) as gui_file:
+            json.dump(gui_data, gui_file)
+            gui_path = gui_file.name
+        
+        try:
+            # Create empty workflow
+            workflow = Workflow(api_json=None, gui_json=None)
+            
+            # Load both JSON files
+            workflow.load_api_json(api_path)
+            workflow.load_gui_json(gui_path)
+            
+            # Verify both were loaded correctly
+            assert workflow.api_json == api_data
+            assert workflow.gui_json == gui_data
+            assert workflow.api_json["1"]["class_type"] == "KSampler"
+            assert len(workflow.gui_json["nodes"]) == 1
+            
+        finally:
+            for path in [api_path, gui_path]:
+                if os.path.exists(path):
+                    try:
+                        os.unlink(path)
+                    except PermissionError:
+                        # On Windows, sometimes the file is still locked
+                        pass
