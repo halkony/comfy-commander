@@ -7,6 +7,9 @@ import requests
 import asyncio
 import base64
 import io
+import os
+import shutil
+import hashlib
 from typing import Dict, Any, Optional, List, Union
 from PIL import Image
 
@@ -390,6 +393,61 @@ class Node:
         if self.workflow.api_json and self.id in self.workflow.api_json:
             return self.workflow.api_json[self.id].get("_meta", {}).get("title", "")
         return ""
+    
+    def set_image(self, image_path: str) -> None:
+        """Set an image for this node by copying it to the server's input directory.
+        
+        Args:
+            image_path: Path to the source image file
+            
+        Raises:
+            ValueError: If server base_dir is not set or workflow hasn't been linked to server
+            FileNotFoundError: If the source image file doesn't exist
+            RuntimeError: If there's an error copying the file
+        """
+        # Get the server from the workflow
+        if not self.workflow._server:
+            raise ValueError("Workflow has not been linked to a server. Call workflow.ensure_api_format(server) first.")
+        
+        server = self.workflow._server
+        
+        # Check if server base_dir is set
+        if not server.base_dir:
+            raise ValueError("Server base_dir is not set. Call server.set_base_dir() first.")
+        
+        # Check if the source file exists
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Source image file not found: {image_path}")
+        
+        # Get the file extension
+        _, ext = os.path.splitext(image_path)
+        if not ext:
+            raise ValueError(f"Source image file has no extension: {image_path}")
+        
+        # Get the base filename without extension
+        base_filename = os.path.basename(image_path)
+        base_name, _ = os.path.splitext(base_filename)
+        
+        # Calculate MD5 hash of the file
+        with open(image_path, 'rb') as f:
+            file_hash = hashlib.md5(f.read()).hexdigest()
+        
+        # Create the new filename with hash
+        new_filename = f"{base_name}{file_hash}{ext}"
+        
+        # Create the input directory if it doesn't exist
+        input_dir = os.path.join(server.base_dir, "input")
+        os.makedirs(input_dir, exist_ok=True)
+        
+        # Copy the file to the input directory
+        destination_path = os.path.join(input_dir, new_filename)
+        try:
+            shutil.copy2(image_path, destination_path)
+        except Exception as e:
+            raise RuntimeError(f"Failed to copy image file: {e}")
+        
+        # Set the image property of the node to the new filename
+        self.set_property_value("image", new_filename)
 
 
 @attrs.define
@@ -398,6 +456,7 @@ class Workflow:
     
     api_json: Dict[str, Any] = attrs.field()
     gui_json: Dict[str, Any] = attrs.field()
+    _server: Optional["ComfyUIServer"] = attrs.field(default=None, init=False)
     
     def __attrs_post_init__(self):
         """Initialize after attrs initialization."""
@@ -669,6 +728,9 @@ class Workflow:
             ConnectionError: If server is not available
             requests.RequestException: If conversion fails
         """
+        # Store the server reference for use by nodes
+        self._server = server
+        
         # Check if we need to convert from GUI format to API format
         needs_conversion = (
             self.gui_json is not None and  # Has GUI data
@@ -703,11 +765,20 @@ class ComfyUIServer:
     
     base_url: str = attrs.field(default="http://localhost:8188")
     timeout: Optional[int] = attrs.field(default=None)
+    base_dir: Optional[str] = attrs.field(default=None)
     
     def __attrs_post_init__(self):
         """Initialize after attrs initialization."""
         # Ensure base_url doesn't end with trailing slash
         self.base_url = self.base_url.rstrip('/')
+    
+    def set_base_dir(self, base_dir: str) -> None:
+        """Set the base directory for the ComfyUI server.
+        
+        Args:
+            base_dir: Path to the ComfyUI base directory
+        """
+        self.base_dir = base_dir
     
     def is_available(self) -> bool:
         """Check if the ComfyUI server is available."""
